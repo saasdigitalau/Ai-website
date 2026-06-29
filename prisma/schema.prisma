@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  email         String?
+  name          String?
+  plan          String    @default("free") // free, starter, pro, business
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  subscriptionStatus String? // active, past_due, canceled, etc.
+  aiCredits     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  websites  Website[]
+  invoices  Invoice[]
+  leads     LeadSearch[]
+}
+
+model Website {
+  id          String   @id @default(cuid())
+  userId      String?
+  name        String
+  description String
+  businessType String
+  html        String
+  published   Boolean  @default(false)
+  customDomain String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  userId      String
+  clientName  String
+  clientEmail String
+  amount      Int      // amount in cents
+  status      String   @default("pending") // pending, sent, paid, overdue
+  invoiceNumber String @unique
+  lineItems   Json?
+  dueDate     DateTime?
+  notes       String?
+  pdfUrl      String?
+  stripePaymentLink String?
+  stripePaymentLinkId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model LeadSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  location  String?
+  results   Json?
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
