@@ -10,11 +10,13 @@ import {
   FileText,
   Settings,
   LogOut,
+  Users,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: Home },
   { href: "/dashboard/sites", label: "My Sites", icon: LayoutDashboard },
+  { href: "/dashboard/clients", label: "Clients", icon: Users },
   { href: "/dashboard/leads", label: "Lead Finder", icon: Search },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

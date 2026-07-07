@@ -17,12 +17,16 @@ model User {
   stripeSubscriptionId String?
   subscriptionStatus String? // active, past_due, canceled, etc.
   aiCredits     Int       @default(0)
+  whiteLabel    Boolean   @default(false) // Remove SiteLaunch branding from client portal
+  whiteLabelLogo String?  // Custom logo URL for white-label
+  whiteLabelDomain String? // Custom domain for client portal
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   websites  Website[]
   invoices  Invoice[]
   leads     LeadSearch[]
+  clients   Client[]
 }
 
 model Website {
@@ -33,11 +37,45 @@ model Website {
   businessType String
   html        String
   published   Boolean  @default(false)
+  approved    Boolean  @default(false) // Client approval status
   customDomain String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   user User? @relation(fields: [userId], references: [id])
+  clients  Client[]
+  feedback Feedback[]
+  blogPosts BlogPost[]
+}
+
+model Client {
+  id          String    @id @default(cuid())
+  userId      String    // The freelancer who owns this client
+  name        String
+  email       String
+  inviteCode  String    @unique
+  websiteId   String?
+  approved    Boolean   @default(false)
+  viewedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User?     @relation(fields: [userId], references: [id])
+  website  Website?  @relation(fields: [websiteId], references: [id])
+  feedback Feedback[]
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  clientId  String
+  websiteId String
+  message   String
+  type      String   @default("comment") // comment, revision, approval
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  website Website @relation(fields: [websiteId], references: [id])
 }
 
 model Invoice {
@@ -70,4 +108,21 @@ model LeadSearch {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  websiteId   String
+  title       String
+  slug        String   @unique
+  content     String
+  excerpt     String?
+  coverImage  String?
+  tags        String?
+  status      String   @default("draft") // draft, published
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id])
 }

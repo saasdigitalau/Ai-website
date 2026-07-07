@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { UserButton } from "@clerk/nextjs";
+import WhiteLabelSettings from "@/components/white-label-settings";
 
 export default async function SettingsPage() {
   const user = await currentUser();
@@ -59,6 +60,13 @@ export default async function SettingsPage() {
             AI Credits: {dbUser?.aiCredits ?? 0}
           </div>
         </div>
+
+        {/* White-Label Portal */}
+        <WhiteLabelSettings
+          initialWhiteLabel={dbUser?.whiteLabel ?? false}
+          initialLogo={dbUser?.whiteLabelLogo ?? null}
+          initialDomain={dbUser?.whiteLabelDomain ?? null}
+        />
       </div>
     </div>
   );
