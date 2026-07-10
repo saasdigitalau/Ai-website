@@ -46,6 +46,7 @@ model Website {
   clients  Client[]
   feedback Feedback[]
   blogPosts BlogPost[]
+  seoResult SeoResult?
 }
 
 model Client {
@@ -125,4 +126,26 @@ model BlogPost {
   updatedAt   DateTime @updatedAt
 
   website Website @relation(fields: [websiteId], references: [id])
+}
+
+model SeoResult {
+  id              String   @id @default(cuid())
+  websiteId       String
+  score           Int      // Overall score 0-100
+  metaTitleScore  Int      @default(0)
+  metaDescScore   Int      @default(0)
+  headingScore    Int      @default(0)
+  imageAltScore   Int      @default(0)
+  mobileScore     Int      @default(0)
+  speedScore      Int      @default(0)
+  keywordScore    Int      @default(0)
+  checks          Json     // Array of check results {name, passed, suggestion}
+  suggestions     Json?    // Array of improvement suggestions
+  rawHtml         String?  // The HTML that was analyzed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id])
+
+  @@unique([websiteId])
 }

@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Globe, FileText, Settings, ExternalLink, Calendar } from "lucide-react";
+import { Globe, FileText, Settings, ExternalLink, Calendar, BarChart3 } from "lucide-react";
 
 export default async function SiteDetailPage({
   params,
@@ -53,6 +53,20 @@ export default async function SiteDetailPage({
           </p>
           <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-indigo-600">
             Manage blog <ExternalLink className="h-3 w-3" />
+          </div>
+        </Link>
+
+        <Link
+          href={`/dashboard/sites/${website.id}/seo`}
+          className="bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-all group"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-sm mb-4 group-hover:scale-105 transition-transform">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <h3 className="font-heading text-lg font-bold text-gray-900">SEO Analysis</h3>
+          <p className="mt-1 text-sm text-gray-500">Score your site and get improvement tips</p>
+          <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-blue-600">
+            View report <ExternalLink className="h-3 w-3" />
           </div>
         </Link>
 
