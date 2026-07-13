@@ -12,12 +12,14 @@ import {
   LogOut,
   Users,
   Palette,
+  MessageCircle,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: Home },
   { href: "/dashboard/sites", label: "My Sites", icon: LayoutDashboard },
   { href: "/dashboard/brand-kit", label: "Brand Kit", icon: Palette },
+  { href: "/dashboard/chat-widget", label: "Chat Widget", icon: MessageCircle },
   { href: "/dashboard/clients", label: "Clients", icon: Users },
   { href: "/dashboard/leads", label: "Lead Finder", icon: Search },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },

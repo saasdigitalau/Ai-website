@@ -47,6 +47,7 @@ model Website {
   feedback Feedback[]
   blogPosts BlogPost[]
   seoResult SeoResult?
+  socialSnippets SocialSnippet[]
 }
 
 model Client {
@@ -148,4 +149,16 @@ model SeoResult {
   website Website @relation(fields: [websiteId], references: [id])
 
   @@unique([websiteId])
+}
+
+model SocialSnippet {
+  id             String   @id @default(cuid())
+  websiteId      String
+  platform       String   // instagram, twitter, linkedin, facebook
+  content        String
+  characterCount Int
+  hashtags       String?  // Comma-separated hashtags
+  createdAt      DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id])
 }
