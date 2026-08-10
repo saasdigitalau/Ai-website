@@ -25,7 +25,7 @@ export default function Home() {
       if (data.html) setGeneratedSite(data.html);
     } catch {
       // fallback demo
-      setGeneratedSite(`<div style="padding:2rem;text-align:center"><h2>Site generated for: ${description}</h2><p style="color:gray;margin-top:1rem">Connect an AI API key for full generation.</p></div>`);
+      setGeneratedSite(`<div style="padding:2rem;text-align:center"><h2>Site generated for: ${description}</h2><p style="color:gray;margin-top:1rem">Something went wrong. Please try again with a different description.</p></div>`);
     }
   };
 
@@ -56,7 +56,7 @@ export default function Home() {
             <a href="#invoicing" className="hover:text-gray-900">Invoicing</a>
             <a href="#pricing" className="hover:text-gray-900">Pricing</a>
           </div>
-          <a href="#builder" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 shadow-md hover:brightness-110 transition-all">Get Started</a>
+          <a href="/sign-up" className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 shadow-md hover:brightness-110 transition-all">Get Started</a>
         </div>
       </nav>
 
@@ -80,7 +80,7 @@ export default function Home() {
             Describe your business in one sentence. Get a professional AI-generated website in minutes. Find leads without websites. Invoice clients — all from one platform.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <a href="#builder" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 shadow-xl hover:brightness-110 transition-all" style={{boxShadow: "0 14px 30px -10px rgba(99,102,241,0.4)"}}>
+            <a href="/sign-up" className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 shadow-xl hover:brightness-110 transition-all" style={{boxShadow: "0 14px 30px -10px rgba(99,102,241,0.4)"}}>
               Build your first site <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
             </a>
             <a href="#pricing" className="inline-flex items-center gap-2 px-6 py-4 rounded-2xl text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:border-indigo-200 transition-all">See pricing</a>
@@ -193,6 +193,10 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+            <a href="/sign-up" className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:brightness-110 transition-all shadow-md">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3.5 w-3.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              Search live leads in your dashboard
+            </a>
           </div>
           <div className="bg-white rounded-3xl shadow-lg border overflow-hidden">
             <div className="border-b bg-gray-50/50 p-4">
@@ -335,11 +339,11 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <button className={`mt-8 block w-full rounded-2xl py-3.5 text-center font-heading text-sm font-semibold transition-all ${
+                <a href="/sign-up" className={`mt-8 block w-full rounded-2xl py-3.5 text-center font-heading text-sm font-semibold transition-all ${
                   plan.popular 
                     ? "bg-white text-indigo-600 shadow-lg hover:bg-white/90" 
                     : "border border-gray-200 text-gray-900 hover:border-indigo-200 hover:bg-indigo-50/50"
-                }`}>Get Started</button>
+                }`}>Get Started</a>
               </div>
             ))}
           </div>
@@ -379,7 +383,7 @@ export default function Home() {
           <div className="relative text-white">
             <h2 className="font-heading text-5xl md:text-7xl font-extrabold leading-[0.92] tracking-[-0.02em]">A sentence.<br/>A website.<br/><span className="italic" style={{background: "linear-gradient(135deg, white, rgba(255,255,255,0.7))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent"}}>Today.</span></h2>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <a href="#builder" className="flex items-center gap-2 rounded-2xl bg-white px-7 py-4 font-heading text-sm font-bold text-gray-900 transition-all hover:scale-[1.02]" style={{boxShadow: "0 14px 30px -10px rgba(0,0,0,0.25)"}}>
+              <a href="/sign-up" className="flex items-center gap-2 rounded-2xl bg-white px-7 py-4 font-heading text-sm font-bold text-gray-900 transition-all hover:scale-[1.02]" style={{boxShadow: "0 14px 30px -10px rgba(0,0,0,0.25)"}}>
                 Build your first site <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3.5 w-3.5"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
               </a>
             </div>

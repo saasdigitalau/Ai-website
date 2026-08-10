@@ -1,21 +1,30 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Globe, Search, FileText, TrendingUp, Plus } from "lucide-react";
+import { Globe, Search, FileText, TrendingUp, Plus, AlertTriangle } from "lucide-react";
+
+async function getDbUser(userId: string) {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    return await prisma.user.findUnique({
+      where: { clerkId: userId },
+      include: {
+        _count: {
+          select: { websites: true, invoices: true, leads: true },
+        },
+      },
+    });
+  } catch {
+    return null;
+  }
+}
 
 export default async function DashboardPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: user.id },
-    include: {
-      _count: {
-        select: { websites: true, invoices: true, leads: true },
-      },
-    },
-  });
+  const dbUser = await getDbUser(user.id);
+  const dbError = dbUser === null;
 
   const stats = [
     {
@@ -50,6 +59,12 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      {dbError && (
+        <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2 text-sm text-amber-800">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Database not connected — stats and persistence unavailable. Connect a database to unlock full functionality.
+        </div>
+      )}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-heading text-2xl font-extrabold text-gray-900">

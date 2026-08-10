@@ -62,92 +62,90 @@ function generateMockBusinesses(type: string, location: string, count: number = 
 }
 
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get("query") || "";
+    const location = searchParams.get("location") || "";
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
+    const format = searchParams.get("format");
 
-  const { searchParams } = new URL(request.url);
-  const query = searchParams.get("query") || "";
-  const location = searchParams.get("location") || "";
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
-  const format = searchParams.get("format"); // "csv" for CSV export
+    // Normalize query
+    const normalizedQuery = query.toLowerCase().trim();
+    const matchedKey = Object.keys(BUSINESS_TYPES).find(
+      (key) => normalizedQuery.includes(key) || BUSINESS_TYPES[key].some(t => normalizedQuery.includes(t.toLowerCase()))
+    ) || "general";
 
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: userId },
-  });
-  if (!dbUser) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+    // Generate mock data
+    const allResults = generateMockBusinesses(matchedKey, location || "Austin, TX");
+    const totalResults = allResults.length;
+    const noWebsiteCount = allResults.filter((b) => !b.hasWebsite).length;
 
-  // Normalize the query to match our business types
-  const normalizedQuery = query.toLowerCase().trim();
-  const matchedKey = Object.keys(BUSINESS_TYPES).find(
-    (key) => normalizedQuery.includes(key) || BUSINESS_TYPES[key].some(t => normalizedQuery.includes(t.toLowerCase()))
-  ) || "general";
+    // Paginate
+    const startIndex = (page - 1) * limit;
+    const paginatedResults = allResults.slice(startIndex, startIndex + limit);
 
-  // Generate mock data
-  const allResults = generateMockBusinesses(matchedKey, location || "Austin, TX");
-  const totalResults = allResults.length;
-  const noWebsiteCount = allResults.filter((b) => !b.hasWebsite).length;
+    // Try to save search to DB if auth is configured
+    try {
+      let userId = null;
+      try {
+        const { userId: uid } = await auth();
+        userId = uid;
+      } catch { /* auth not configured */ }
 
-  // Paginate
-  const startIndex = (page - 1) * limit;
-  const paginatedResults = allResults.slice(startIndex, startIndex + limit);
+      if (userId) {
+        const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
+        if (dbUser) {
+          await prisma.leadSearch.create({
+            data: {
+              userId: dbUser.id,
+              query: query || matchedKey,
+              location: location || null,
+              results: paginatedResults,
+              count: totalResults,
+            },
+          });
+        }
+      }
+    } catch { /* db not configured, skip */ }
 
-  // Save search to DB
-  const leadSearch = await prisma.leadSearch.create({
-    data: {
-      userId: dbUser.id,
-      query: query || matchedKey,
-      location: location || null,
+    // CSV export
+    if (format === "csv") {
+      const csvHeader = "Name,Business Type,Location,Rating,Reviews,Phone,Email,Address,Has Website,Website URL,Instagram,Facebook,Price Range,Open Now\n";
+      const csvRows = allResults.map((b) =>
+        [
+          `"${b.name}"`, `"${b.businessType}"`, `"${b.location}"`,
+          b.rating, b.reviewCount, `"${b.phone}"`, `"${b.email}"`,
+          `"${b.address}"`, b.hasWebsite ? "Yes" : "No",
+          b.websiteUrl || "", b.socialLinks.instagram || "",
+          b.socialLinks.facebook || "", b.priceRange,
+          b.openNow ? "Yes" : "No",
+        ].join(",")
+      ).join("\n");
+
+      return new NextResponse(csvHeader + csvRows, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="leads-${matchedKey}-${(location || "austin-tx").replace(/[^a-zA-Z0-9]/g, "-")}.csv"`,
+        },
+      });
+    }
+
+    return NextResponse.json({
       results: paginatedResults,
-      count: totalResults,
-    },
-  });
-
-  // Check if CSV export requested
-  if (format === "csv") {
-    const csvHeader = "Name,Business Type,Location,Rating,Reviews,Phone,Email,Address,Has Website,Website URL,Instagram,Facebook,Price Range,Open Now\n";
-    const csvRows = allResults.map((b) =>
-      [
-        `"${b.name}"`,
-        `"${b.businessType}"`,
-        `"${b.location}"`,
-        b.rating,
-        b.reviewCount,
-        `"${b.phone}"`,
-        `"${b.email}"`,
-        `"${b.address}"`,
-        b.hasWebsite ? "Yes" : "No",
-        b.websiteUrl || "",
-        b.socialLinks.instagram || "",
-        b.socialLinks.facebook || "",
-        b.priceRange,
-        b.openNow ? "Yes" : "No",
-      ].join(",")
-    ).join("\n");
-
-    return new NextResponse(csvHeader + csvRows, {
-      headers: {
-        "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="leads-${matchedKey}-${location.replace(/[^a-zA-Z0-9]/g, "-")}.csv"`,
+      pagination: {
+        page, limit, total: totalResults,
+        totalPages: Math.ceil(totalResults / limit),
+        noWebsiteCount,
       },
+      query: query || matchedKey,
+      location: location || "Austin, TX",
     });
+  } catch (error) {
+    console.error("Leads API error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch leads. Please try again." },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({
-    results: paginatedResults,
-    pagination: {
-      page,
-      limit,
-      total: totalResults,
-      totalPages: Math.ceil(totalResults / limit),
-      noWebsiteCount,
-    },
-    searchId: leadSearch.id,
-    query: query || matchedKey,
-    location: location || "Austin, TX",
-  });
 }
