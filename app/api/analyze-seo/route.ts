@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 interface SeoCheck {
   name: string;
@@ -231,8 +232,8 @@ export async function POST(request: NextRequest) {
           mobileScore: getCategoryScore("mobile"),
           speedScore: getCategoryScore("speed"),
           keywordScore: getCategoryScore("keywords"),
-          checks,
-          suggestions,
+          checks: checks as unknown as Prisma.InputJsonValue,
+          suggestions: suggestions as unknown as Prisma.InputJsonValue,
           rawHtml: html.substring(0, 10000), // Store first 10k chars
         },
         update: {
@@ -244,8 +245,8 @@ export async function POST(request: NextRequest) {
           mobileScore: getCategoryScore("mobile"),
           speedScore: getCategoryScore("speed"),
           keywordScore: getCategoryScore("keywords"),
-          checks,
-          suggestions,
+          checks: checks as unknown as Prisma.InputJsonValue,
+          suggestions: suggestions as unknown as Prisma.InputJsonValue,
           rawHtml: html.substring(0, 10000),
         },
       });
