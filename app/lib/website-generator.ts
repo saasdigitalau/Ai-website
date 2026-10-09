@@ -199,9 +199,30 @@ function extractName(description: string, businessType: string): string {
   return BUSINESS_TEMPLATES[businessType]?.defaultName || "Professional Services";
 }
 
-function generateHtml(data: WebsiteData["metadata"], content: any): string {
+// UI chrome strings, translated for the most common languages.
+// Keys are English; values are Record<langCode, translation>. Falls back to English.
+const UI_STRINGS: Record<string, Record<string, string>> = {
+  About: { es: "Nosotros", fr: "À propos", de: "Über uns", it: "Chi siamo", pt: "Sobre nós", ja: "私たちについて", zh: "关于我们", ar: "من نحن" },
+  Services: { es: "Servicios", fr: "Services", de: "Leistungen", it: "Servizi", pt: "Serviços", ja: "サービス", zh: "服务", ar: "خدماتنا" },
+  Testimonials: { es: "Testimonios", fr: "Témoignages", de: "Bewertungen", it: "Testimonianze", pt: "Depoimentos", ja: "お客様の声", zh: "客户评价", ar: "آراء العملاء" },
+  Contact: { es: "Contacto", fr: "Contact", de: "Kontakt", it: "Contatti", pt: "Contato", ja: "お問い合わせ", zh: "联系我们", ar: "اتصل بنا" },
+  "Open For Business": { es: "Abierto al público", fr: "Ouvert au public", de: "Geöffnet", it: "Aperto", pt: "Aberto", ja: "営業中", zh: "营业中", ar: "مفتوح للعمل" },
+  "Get Started": { es: "Empezar", fr: "Commencer", de: "Loslegen", it: "Inizia", pt: "Começar", ja: "はじめる", zh: "开始", ar: "ابدأ" },
+  "Our Services": { es: "Nuestros servicios", fr: "Nos services", de: "Unsere Leistungen", it: "I nostri servizi", pt: "Nossos serviços", ja: "サービス内容", zh: "我们的服务", ar: "خدماتنا" },
+  "Our Story": { es: "Nuestra historia", fr: "Notre histoire", de: "Unsere Geschichte", it: "La nostra storia", pt: "Nossa história", ja: "私たちのストーリー", zh: "我们的故事", ar: "قصتنا" },
+  "What We Offer": { es: "Qué ofrecemos", fr: "Ce que nous proposons", de: "Was wir anbieten", it: "Cosa offriamo", pt: "O que oferecemos", ja: "私たちの提供内容", zh: "我们提供什么", ar: "ماذا نقدم" },
+  "What Clients Say": { es: "Qué dicen los clientes", fr: "Ce que disent nos clients", de: "Das sagen Kunden", it: "Cosa dicono i clienti", pt: "O que dizem os clientes", ja: "お客様の声", zh: "客户评价", ar: "ماذا يقول العملاء" },
+  "Get In Touch": { es: "Ponte en contacto", fr: "Entrez en contact", de: "Kontakt aufnehmen", it: "Mettiti in contatto", pt: "Entre em contato", ja: "お問い合わせ", zh: "联系我们", ar: "تواصل معنا" },
+  "Built with SiteLaunch AI": { es: "Creado con SiteLaunch AI", fr: "Créé avec SiteLaunch AI", de: "Erstellt mit SiteLaunch AI", it: "Creato con SiteLaunch AI", pt: "Criado com SiteLaunch AI", ja: "SiteLaunch AIで作成", zh: "由SiteLaunch AI创建", ar: "تم إنشاؤه بواسطة SiteLaunch AI" },
+};
+
+function T(str: string, lang: string): string {
+  return UI_STRINGS[str]?.[lang] || str;
+}
+
+function generateHtml(data: WebsiteData["metadata"], content: any, lang: string = "en"): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -223,10 +244,10 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
         <span class="font-bold text-lg">${data.name}</span>
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-        <a href="#about" class="hover:text-gray-900">About</a>
-        <a href="#services" class="hover:text-gray-900">Services</a>
-        <a href="#testimonials" class="hover:text-gray-900">Testimonials</a>
-        <a href="#contact" class="hover:text-gray-900">Contact</a>
+        <a href="#about" class="hover:text-gray-900">${T("About", lang)}</a>
+        <a href="#services" class="hover:text-gray-900">${T("Services", lang)}</a>
+        <a href="#testimonials" class="hover:text-gray-900">${T("Testimonials", lang)}</a>
+        <a href="#contact" class="hover:text-gray-900">${T("Contact", lang)}</a>
       </div>
     </div>
   </nav>
@@ -235,13 +256,13 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
     <div class="max-w-6xl mx-auto px-6 py-20">
       <div class="max-w-3xl">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-6" style="background:${data.primaryColor}20;color:${data.primaryColor}">
-          <span>★</span> Open For Business
+          <span>★</span> ${T("Open For Business", lang)}
         </div>
         <h1 class="text-5xl md:text-7xl font-extrabold leading-[0.95] tracking-tight text-gray-900">${content.heroTitle}</h1>
         <p class="mt-6 text-lg md:text-xl text-gray-600 max-w-xl leading-relaxed">${content.heroSubtitle}</p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <a href="#contact" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}">Get Started <i class="fas fa-arrow-right text-xs"></i></a>
-          <a href="#services" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 bg-white shadow-sm hover:shadow transition-all border border-gray-200">Our Services</a>
+          <a href="#contact" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}">${T("Get Started", lang)} <i class="fas fa-arrow-right text-xs"></i></a>
+          <a href="#services" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 bg-white shadow-sm hover:shadow transition-all border border-gray-200">${T("Our Services", lang)}</a>
         </div>
       </div>
     </div>
@@ -249,8 +270,8 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
 
   <section id="about" class="py-20 px-6">
     <div class="max-w-4xl mx-auto text-center">
-      <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">About</div>
-      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">Our Story</h2>
+      <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("About", lang)}</div>
+      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("Our Story", lang)}</h2>
       <p class="mt-6 text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">${content.aboutText}</p>
     </div>
   </section>
@@ -258,8 +279,8 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
   <section id="services" class="py-20 px-6 bg-gray-50">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12">
-        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Services</div>
-        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">What We Offer</h2>
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Services", lang)}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("What We Offer", lang)}</h2>
       </div>
       <div class="grid md:grid-cols-3 gap-6">
         ${content.services.map((s: any) => `
@@ -277,8 +298,8 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
   <section id="testimonials" class="py-20 px-6">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12">
-        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Testimonials</div>
-        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">What Clients Say</h2>
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Testimonials", lang)}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("What Clients Say", lang)}</h2>
       </div>
       <div class="grid md:grid-cols-3 gap-6">
         ${content.testimonials.map((t: any) => `
@@ -298,8 +319,8 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
   <section id="contact" class="py-20 px-6" style="background:${data.secondaryColor}">
     <div class="max-w-4xl mx-auto">
       <div class="text-center mb-12">
-        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Contact</div>
-        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">Get In Touch</h2>
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Contact", lang)}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("Get In Touch", lang)}</h2>
       </div>
       <div class="grid md:grid-cols-3 gap-6">
         <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
@@ -322,28 +343,34 @@ function generateHtml(data: WebsiteData["metadata"], content: any): string {
   </section>
 
   <footer class="py-8 px-6 bg-gray-900 text-gray-400 text-center text-sm">
-    <p>© 2026 ${data.name}. Built with SiteLaunch AI.</p>
+    <p>© 2026 ${data.name}. ${T("Built with SiteLaunch AI", lang)}.</p>
   </footer>
 </body>
 </html>`;
 }
 
-export async function generateWebsite(description: string, businessType?: string): Promise<WebsiteData> {
+export async function generateWebsite(
+  description: string,
+  businessType?: string,
+  name?: string,
+  lang: string = "en"
+): Promise<WebsiteData> {
   const type = businessType || extractBusinessType(description);
   const template = BUSINESS_TEMPLATES[type] || BUSINESS_TEMPLATES.general;
-  const name = extractName(description, type);
-  const content = template.generateContent(name, description);
+  const siteName = name || extractName(description, type);
+  const content = template.generateContent(siteName, description);
 
   const metadata: WebsiteData["metadata"] = {
-    name,
+    name: siteName,
     description,
     businessType: type,
     primaryColor: template.primaryColor,
     secondaryColor: template.secondaryColor,
     fontFamily: template.fontFamily,
-    logoText: name
-  };
+    logoText: siteName,
+    lang,
+  } as WebsiteData["metadata"] & { lang: string };
 
-  const html = generateHtml(metadata, content);
+  const html = generateHtml(metadata, content, lang);
   return { html, metadata };
 }
