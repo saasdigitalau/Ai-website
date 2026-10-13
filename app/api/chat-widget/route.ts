@@ -126,11 +126,20 @@ export async function POST(request: NextRequest) {
 
       const { primaryColor = "#6366f1", position = "right", greeting = "Hi! Thanks for visiting. How can I help?", language: widgetLang = "en" } = widgetConfig;
 
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const embedParams = new URLSearchParams({
+        websiteId,
+        primaryColor,
+        position,
+        greeting,
+        language: widgetLang,
+      });
+
       const embedCode = `<!-- SiteLaunch AI Chat Widget -->
 <script>
 (function() {
   var s = document.createElement('script');
-  s.src = '${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/chat-widget/embed.js';
+  s.src = '${baseUrl}/api/chat-widget/embed?${embedParams.toString()}';
   s.setAttribute('data-website-id', '${websiteId}');
   s.setAttribute('data-primary-color', '${primaryColor}');
   s.setAttribute('data-position', '${position}');
