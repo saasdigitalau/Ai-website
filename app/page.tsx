@@ -180,10 +180,10 @@ export default function Home() {
               Lead Finder
             </div>
             <h2 className="font-heading text-4xl md:text-5xl font-extrabold leading-[0.98] tracking-tight text-gray-900">Find local customers <br/><span className="text-gradient">in seconds.</span></h2>
-            <p className="mt-5 text-gray-500 leading-relaxed max-w-lg">Included with every plan: pull 200M+ local businesses from Google. Phone, email, address — auto-flagged when they don&apos;t have a website.</p>
+            <p className="mt-5 text-gray-500 leading-relaxed max-w-lg">Included with every plan: real local businesses, looked up live from Google Places. Phone, address, and rating — auto-flagged when their listing shows no website.</p>
             <ul className="mt-7 space-y-3">
               {[
-                ["200M+ businesses, live data", "— Google Business + AI enrichment."],
+                ["Live Google Places data", "— Real local businesses looked up live, flagged when their listing shows no website."],
                 ["No-website flag", "— Sort straight to your hottest prospects."],
                 ["Build them a page in seconds", "— Turn a lead into a customer in the same tab."]
               ].map(([a, b]) => (
@@ -361,7 +361,7 @@ export default function Home() {
             {[
               ["What kinds of pages can SiteLaunch build?", "Landing pages for any kind of small business — restaurants, gyms, salons, freelancers, services, events, online stores. If a customer needs to find you online, we can build it."],
               ["Do I need to know how to code?", "Not at all. Just describe your business in plain English. Our AI handles all the design and development. You can customize colors, text, and images without touching code."],
-              ["How does Lead Finder get its data?", "It pulls from Google Business profiles and AI enrichment. We index 200M+ businesses, flag which ones lack a website, and surface their contact info so you can reach out."],
+              ["How does Lead Finder get its data?", "It looks up real local businesses live from Google Places and flags the ones whose listing shows no website — phone, address, and rating, so you can reach out before your competitors do."],
               ["How does invoicing work?", "Create a professional invoice with line items, send it as a PDF or link, and track payment status (paid/pending/overdue). Your clients pay you directly — no processing fees."]
             ].map(([q, a]) => (
               <details key={q} className="overflow-hidden rounded-2xl bg-white ring-1 ring-gray-100">
