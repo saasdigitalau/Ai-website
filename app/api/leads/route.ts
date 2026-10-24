@@ -117,6 +117,24 @@ class NotConfiguredError extends Error {
   }
 }
 
+// A failed call to the Google Places API. Kept as a distinct type so the
+// handler can return a short, user-safe error instead of leaking Google's
+// raw response body (which can contain keys/scope details) to the client.
+class PlacesApiError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`Google Places lookup failed (${status}).`);
+    this.name = "PlacesApiError";
+    this.status = status;
+  }
+}
+
+function isPlacesConfigError(status: number): boolean {
+  // 401/403 mean the API key is missing, invalid, not enabled, or out of
+  // quota — a configuration problem, so we surface the "not connected" state.
+  return status === 401 || status === 403;
+}
+
 async function fetchFromGooglePlaces(
   textQuery: string,
   location: string,
@@ -141,7 +159,9 @@ async function fetchFromGooglePlaces(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`Google Places request failed (${res.status}): ${detail.slice(0, 300) || res.statusText}`);
+    // Log the full response server-side for debugging; never send it to the browser.
+    console.error(`Google Places API error ${res.status}: ${detail.slice(0, 500) || res.statusText}`);
+    throw new PlacesApiError(res.status);
   }
 
   const data = await res.json();
@@ -355,6 +375,19 @@ export async function GET(request: NextRequest) {
           },
           { status: 503 }
         );
+      }
+      if (err instanceof PlacesApiError) {
+        if (isPlacesConfigError(err.status)) {
+          return NextResponse.json(
+            {
+              status: "not_configured",
+              error:
+                "Lead search is not connected yet. The Google Places search key is missing, invalid, or has run out of quota — check the configured key and try again.",
+            },
+            { status: 503 }
+          );
+        }
+        return NextResponse.json({ status: "error", error: err.message }, { status: 502 });
       }
       throw err;
     }
