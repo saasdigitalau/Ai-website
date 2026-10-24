@@ -1,0 +1,51 @@
+name: CI
+
+# Runs on every pull request and on pushes to main. "next build" is the
+# project's build gate (typescript.ignoreBuildErrors is enabled in
+# next.config, so the build is the authoritative check). Extra guards below
+# fail CI if fabricated lead data or stale claims ever come back.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Install, build, guard against fabricated data
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_ci_placeholder"
+      CLERK_SECRET_KEY: "sk_test_ci_placeholder"
+      DATABASE_URL: "postgresql://ci:ci@127.0.0.1:5432/ci"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the app
+        run: npm run build
+
+      # The lead finder must never fall back to invented businesses again.
+      - name: Fail if the leads route fabricates data
+        run: |
+          if grep -q "Math.random" app/api/leads/route.ts; then
+            echo "::error::app/api/leads/route.ts must not contain Math.random()"
+            exit 1
+          fi
+
+      # Landing page copy must not overstate the lead finder's data source.
+      - name: Fail on stale fabricated-business claims in app/
+        run: |
+          if grep -rE '200M\+ businesses|AI enrichment' app; then
+            echo "::error::stale fabricated-business claim found in app/"
+            exit 1
+          fi
