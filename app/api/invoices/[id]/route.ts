@@ -80,6 +80,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id, user: { clerkId: userId } },
   });
   if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  if (!stripe) {
+    return NextResponse.json({ error: "Payments are not configured." }, { status: 503 });
+  }
 
   try {
     // Create a Stripe payment link

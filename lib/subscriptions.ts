@@ -12,6 +12,7 @@ export async function createCheckoutSession(plan: PlanKey) {
   if (!planConfig) throw new Error("Invalid plan");
 
   const user = await prisma.user.findUnique({ where: { clerkId: userId } });
+  if (!stripe) throw new Error("Stripe is not configured.");
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
@@ -40,6 +41,7 @@ export async function getStripeSession() {
 
   const user = await prisma.user.findUnique({ where: { clerkId: userId } });
   if (!user?.stripeSubscriptionId) return null;
+  if (!stripe) throw new Error("Stripe is not configured.");
 
   const subscription = await stripe.subscriptions.retrieve(
     user.stripeSubscriptionId

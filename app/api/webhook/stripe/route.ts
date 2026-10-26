@@ -3,6 +3,12 @@ import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return NextResponse.json(
+      { error: "Payments are not configured." },
+      { status: 503 }
+    );
+  }
   const body = await req.text();
   const signature = req.headers.get("stripe-signature") as string;
 
