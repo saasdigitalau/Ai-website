@@ -49,3 +49,21 @@ jobs:
             echo "::error::stale fabricated-business claim found in app/"
             exit 1
           fi
+
+      # The landing page must not claim live Google Places lookups while no key
+      # is configured. Describe the search; say it is not switched on yet.
+      - name: Fail if the landing page claims live Google Places results
+        run: |
+          if grep -inE 'looked up live|look up .* live|live from google places|live google places (data|results)|search live leads' app/page.tsx; then
+            echo "::error::app/page.tsx claims a live Google Places lookup — while GOOGLE_PLACES_API_KEY is unset that claim is false. Say the search is not switched on yet."
+            exit 1
+          fi
+
+      # Real (non-demo) lead searches must stay behind auth so our paid Google
+      # Places quota cannot be spent by anonymous callers.
+      - name: Fail if the leads route drops the signed-in-user gate
+        run: |
+          if ! grep -q 'status: 401' app/api/leads/route.ts; then
+            echo "::error::app/api/leads/route.ts must return 401 for real searches without a signed-in user."
+            exit 1
+          fi

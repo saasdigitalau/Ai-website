@@ -11,6 +11,17 @@ import { prisma } from "@/lib/prisma";
 // an explicit "not_configured" response (503) — we never invent businesses,
 // phone numbers, emails, addresses, ratings or review counts.
 //
+// A real (non-demo) search requires a signed-in Clerk user: Google Places
+// calls are billed per request, so an anonymous caller must never be able to
+// spend our quota. Unauthenticated real searches get 401. Demo mode (demo=1)
+// is the only path that works without a session — it is clearly labelled
+// sample data and costs nothing.
+//
+// Check order for a GET: (1) missing "query" → 400, (2) demo=1 → sample data,
+// (3) no signed-in user → 401, (4) no/invalid Google Places key → 503
+// not_configured, (5) real Places results. Because the auth gate runs before
+// the provider check, an anonymous caller always sees 401 rather than 503.
+//
 // Demo mode is strictly opt-in: the client must pass demo=1 (the dashboard
 // only sends it after the user clicks a clearly labelled "Preview with sample
 // data" button). Every demo payload carries { demo: true } with each lead
@@ -358,6 +369,19 @@ export async function GET(request: NextRequest) {
     }
 
     // ---- Live provider: Google Places (GOOGLE_PLACES_API_KEY) ----
+    // Real searches spend paid Google Places quota, so they require a signed-in
+    // user. Demo mode above is the only unauthenticated path.
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        {
+          status: "unauthorized",
+          error: "Sign in to search real local businesses.",
+        },
+        { status: 401 }
+      );
+    }
+
     let leads: Lead[] = [];
     let nextPageToken: string | null = null;
     try {
@@ -406,25 +430,24 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Best-effort: record the search for future CRM use when auth + DB exist.
+    // Best-effort: record the search for future CRM use. The caller is already
+    // authenticated above; the DB may still be unconfigured, in which case the
+    // results are returned without being logged.
     try {
-      const { userId } = await auth();
-      if (userId) {
-        const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
-        if (dbUser) {
-          await prisma.leadSearch.create({
-            data: {
-              userId: dbUser.id,
-              query,
-              location: location || null,
-              results: pageLeads as unknown as Prisma.InputJsonValue,
-              count: pageLeads.length,
-            },
-          });
-        }
+      const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
+      if (dbUser) {
+        await prisma.leadSearch.create({
+          data: {
+            userId: dbUser.id,
+            query,
+            location: location || null,
+            results: pageLeads as unknown as Prisma.InputJsonValue,
+            count: pageLeads.length,
+          },
+        });
       }
     } catch {
-      /* auth or DB not configured — searching still works */
+      /* DB not configured — search results are still returned */
     }
 
     return NextResponse.json({
