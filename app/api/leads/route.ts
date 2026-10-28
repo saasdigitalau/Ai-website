@@ -291,11 +291,18 @@ const DEMO_LEADS: Omit<Lead, "sample">[] = [
 ];
 
 function demoLeads(query: string, location: string): Lead[] {
-  return DEMO_LEADS.map((l) => ({ ...l, location: location || l.location, sample: true })).filter((l) => {
-    const q = query.toLowerCase();
-    if (!q) return true;
-    return l.name.toLowerCase().includes(q) || l.businessType.toLowerCase().includes(q);
+  const all = DEMO_LEADS.map((l) => ({ ...l, location: location || l.location, sample: true }));
+  const q = query.toLowerCase().trim();
+  if (!q) return all;
+  // Match the sample set loosely to the query ("restaurants" ~ "restaurant"),
+  // but never return an empty demo: an empty "sample data" preview looks like a
+  // broken feature rather than a labelled example.
+  const singular = q.replace(/(es|s)$/, "");
+  const matches = all.filter((l) => {
+    const haystack = `${l.name} ${l.businessType} ${l.businessType.replace(/s$/, "")}`.toLowerCase();
+    return haystack.includes(q) || haystack.includes(singular);
   });
+  return matches.length > 0 ? matches : all;
 }
 
 function toCSV(leads: Lead[], demo: boolean): string {
