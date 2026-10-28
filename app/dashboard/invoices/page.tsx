@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, FileText, Search, Filter, MoreHorizontal, Download, Trash2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
+import { startInvoicePayment } from "@/components/payment-actions";
 
 interface Invoice {
   id: string;
@@ -73,17 +74,9 @@ export default function InvoicesPage() {
 
   const handleGeneratePaymentLink = async (id: string) => {
     try {
-      const res = await fetch(`/api/invoices/${id}/pay`, { method: "POST" });
-      if (res.ok) {
-        const invoice = await res.json();
-        toast.success("Payment link created!");
-        fetchInvoices();
-      } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to create payment link");
-      }
-    } catch {
-      toast.error("Failed to create payment link");
+      await startInvoicePayment(id, { onPaid: fetchInvoices });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start payment");
     }
   };
 
@@ -214,7 +207,7 @@ export default function InvoicesPage() {
                         onClick={() => handleGeneratePaymentLink(inv.id)}
                         className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 transition-all"
                       >
-                        Generate Payment Link
+                        Collect Payment
                       </button>
                     )}
                     {inv.stripePaymentLink && (
