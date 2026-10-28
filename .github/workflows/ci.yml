@@ -23,6 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Cheapest, fastest failure: claim families the team keeps regressing on.
+      # Evidence base and row numbers: /home/team/shared/HONESTY-AUDIT.md
+      - name: Honesty guard (fabricated social proof, payment, hosting and AI claims)
+        run: bash .github/scripts/honesty-guard.sh
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20

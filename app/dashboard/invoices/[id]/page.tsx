@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { ArrowLeft, Download, ExternalLink, Send, Trash2, Copy, Check } from "lucide-react";
@@ -31,18 +31,11 @@ const STATUS_BADGES: Record<string, { color: string; bg: string }> = {
 export default function InvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get("paid") === "true") {
-      toast.success("Payment received! Invoice marked as paid.");
-      markAsPaid();
-    }
-  }, [searchParams]);
 
   const fetchInvoice = async () => {
     try {

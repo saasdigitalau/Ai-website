@@ -24,19 +24,29 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       heroSubtitle: `Taste the finest culinary creations made with fresh, organic ingredients.`,
       aboutText: `Welcome to ${name}. ${desc || "We are a passion-driven culinary destination dedicated to bringing you an exceptional dining experience."}`,
       services: [
-        { title: "Fine Dining", desc: "Multi-course menu paired with exceptional wines.", price: "$$$" },
-        { title: "Private Events", desc: "Celebrate special occasions with custom catering.", price: "Custom" },
-        { title: "Express Takeout", desc: "Enjoy your favorite dishes at home.", price: "From $12" }
+        { title: "Fine Dining", desc: "Multi-course menu paired with exceptional wines.", price: "[Your price]" },
+        { title: "Private Events", desc: "Celebrate special occasions with custom catering.", price: "[Your price]" },
+        { title: "Express Takeout", desc: "Enjoy your favorite dishes at home.", price: "[Your price]" }
       ],
       testimonials: [
-        { name: "Sarah M.", text: "Every single dish was a masterpiece! Absolute perfection.", role: "Food Critic" },
-        { name: "John D.", text: "Incredible service, stunning presentation and flavors.", role: "Regular Guest" }
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
       ],
       contactInfo: {
-        address: "123 Culinary Lane",
-        phone: "(555) 123-4567",
-        email: `reservations@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        hours: "Tue-Sun: 5PM-10PM"
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
       }
     })
   },
@@ -52,19 +62,29 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       heroSubtitle: `No excuses. Just results. Join the premier fitness community.`,
       aboutText: `At ${name}, ${desc || "we believe fitness is a lifestyle. Our elite coaches and motivating classes help you shatter your limits."}`,
       services: [
-        { title: "Personal Training", desc: "One-on-one tailored fitness programming.", price: "$75/session" },
-        { title: "Group Classes", desc: "HIIT, CrossFit, and strength conditioning.", price: "Included" },
-        { title: "Open Gym", desc: "24/7 access to top-of-the-line equipment.", price: "$49/month" }
+        { title: "Personal Training", desc: "One-on-one tailored fitness programming.", price: "[Your price]" },
+        { title: "Group Classes", desc: "HIIT, CrossFit, and strength conditioning.", price: "[Your price]" },
+        { title: "Open Gym", desc: "24/7 access to top-of-the-line equipment.", price: "[Your price]" }
       ],
       testimonials: [
-        { name: "Mike T.", text: "Best gym in town. The coaching staff is world-class.", role: "Member 2 Years" },
-        { name: "Jessica R.", text: "Results in 3 months I couldn't get in 3 years elsewhere.", role: "Athlete" }
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
       ],
       contactInfo: {
-        address: "456 Powerhouse Blvd",
-        phone: "(555) 987-6543",
-        email: `info@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        hours: "Mon-Fri: 5AM-11PM | Sat-Sun: 7AM-8PM"
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
       }
     })
   },
@@ -80,19 +100,29 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       heroSubtitle: `Where beauty meets relaxation. Premium care for every style.`,
       aboutText: `${name} ${desc || "is a luxury beauty destination offering premium hair, nail, and skincare services. Our expert stylists bring out your best."}`,
       services: [
-        { title: "Signature Hair", desc: "Cut, color, and styling by master stylists.", price: "From $65" },
-        { title: "Luxury Facial", desc: "Rejuvenating treatments for radiant skin.", price: "$90" },
-        { title: "Nail Art", desc: "Custom designs from gel to acrylic.", price: "From $35" }
+        { title: "Signature Hair", desc: "Cut, color, and styling by master stylists.", price: "[Your price]" },
+        { title: "Luxury Facial", desc: "Rejuvenating treatments for radiant skin.", price: "[Your price]" },
+        { title: "Nail Art", desc: "Custom designs from gel to acrylic.", price: "[Your price]" }
       ],
       testimonials: [
-        { name: "Annie K.", text: "The best blowout I've ever had! The salon is gorgeous.", role: "Style Blogger" },
-        { name: "Rachel P.", text: "My go-to for every special occasion. Flawless every time.", role: "Regular Client" }
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
       ],
       contactInfo: {
-        address: "789 Beauty Avenue",
-        phone: "(555) 456-7890",
-        email: `hello@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        hours: "Mon-Sat: 9AM-8PM"
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
       }
     })
   },
@@ -108,19 +138,29 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       heroSubtitle: `Gentle, modern dentistry. We make every visit comfortable.`,
       aboutText: `${name} ${desc || "provides comprehensive dental care with cutting-edge technology. Your comfort and smile are our top priorities."}`,
       services: [
-        { title: "General Dentistry", desc: "Cleanings, exams, and preventive care.", price: "Insurance accepted" },
-        { title: "Cosmetic", desc: "Whitening, veneers, and smile makeovers.", price: "From $200" },
-        { title: "Orthodontics", desc: "Invisalign and braces for all ages.", price: "Free consult" }
+        { title: "General Dentistry", desc: "Cleanings, exams, and preventive care.", price: "[Your price]" },
+        { title: "Cosmetic", desc: "Whitening, veneers, and smile makeovers.", price: "[Your price]" },
+        { title: "Orthodontics", desc: "Invisalign and braces for all ages.", price: "[Your price]" }
       ],
       testimonials: [
-        { name: "Tom L.", text: "Haven't been this relaxed at a dentist ever. Amazing team!", role: "Patient" },
-        { name: "Maria G.", text: "My smile has never looked better. Life-changing results.", role: "Patient" }
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
       ],
       contactInfo: {
-        address: "321 Health Drive",
-        phone: "(555) 234-5678",
-        email: `care@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        hours: "Mon-Fri: 8AM-5PM"
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
       }
     })
   },
@@ -136,19 +176,29 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       heroSubtitle: `A sanctuary for body, mind, and soul. All levels welcome.`,
       aboutText: `${name} ${desc || "is a welcoming space where you can step away from the noise of daily life and reconnect with yourself through mindful movement and breath."}`,
       services: [
-        { title: "Vinyasa Flow", desc: "Dynamic sequences linking breath with movement.", price: "$20/class" },
-        { title: "Sound Healing", desc: "Restorative sessions with singing bowls.", price: "$30/class" },
-        { title: "Private Sessions", desc: "One-on-one guidance tailored to you.", price: "$75/session" }
+        { title: "Vinyasa Flow", desc: "Dynamic sequences linking breath with movement.", price: "[Your price]" },
+        { title: "Sound Healing", desc: "Restorative sessions with singing bowls.", price: "[Your price]" },
+        { title: "Private Sessions", desc: "One-on-one guidance tailored to you.", price: "[Your price]" }
       ],
       testimonials: [
-        { name: "Emily R.", text: "This studio changed my life. The instructors are incredible.", role: "Member" },
-        { name: "David K.", text: "A peaceful oasis. I leave every class feeling renewed.", role: "Student" }
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
       ],
       contactInfo: {
-        address: "555 Harmony Street",
-        phone: "(555) 789-0123",
-        email: `om@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        hours: "Mon-Sat: 6AM-8PM | Sun: 8AM-2PM"
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
       }
     })
   },
@@ -164,19 +214,29 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       heroSubtitle: `Professional services tailored to your needs.`,
       aboutText: `${name} ${desc || "delivers top-quality professional services. We're committed to excellence and client satisfaction in everything we do."}`,
       services: [
-        { title: "Consultation", desc: "Expert advice tailored to your goals.", price: "Free initial" },
-        { title: "Full Service", desc: "End-to-end management of your project.", price: "Quote based" },
-        { title: "Support", desc: "Ongoing maintenance and support.", price: "Monthly retainer" }
+        { title: "Consultation", desc: "Expert advice tailored to your goals.", price: "[Your price]" },
+        { title: "Full Service", desc: "End-to-end management of your project.", price: "[Your price]" },
+        { title: "Support", desc: "Ongoing maintenance and support.", price: "[Your price]" }
       ],
       testimonials: [
-        { name: "Client A.", text: "Exceptional service from start to finish. Highly recommend!", role: "Client" },
-        { name: "Client B.", text: "Professional, responsive, and delivered beyond expectations.", role: "Client" }
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
       ],
       contactInfo: {
-        address: "100 Business Park",
-        phone: "(555) 555-5555",
-        email: `hello@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        hours: "Mon-Fri: 9AM-6PM"
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
       }
     })
   }
@@ -218,6 +278,13 @@ const UI_STRINGS: Record<string, Record<string, string>> = {
 
 function T(str: string, lang: string): string {
   return UI_STRINGS[str]?.[lang] || str;
+}
+
+// Avatar initial for a testimonial name. Placeholder names ("[Customer name]")
+// must not print a bracket, so fall back to a neutral glyph.
+function initial(name: string): string {
+  const m = /[A-Za-z0-9]/.exec(name || "");
+  return m ? m[0].toUpperCase() : "•";
 }
 
 function generateHtml(data: WebsiteData["metadata"], content: any, lang: string = "en"): string {
@@ -304,10 +371,10 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       <div class="grid md:grid-cols-3 gap-6">
         ${content.testimonials.map((t: any) => `
         <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div class="flex items-center gap-1 text-amber-400 text-sm mb-4">${"★".repeat(5)}</div>
+          ${t.stars ? `<div class="flex items-center gap-1 text-amber-400 text-sm mb-4">${"★".repeat(t.stars)}</div>` : `<div class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Sample review</div>`}
           <p class="text-gray-600 text-sm leading-relaxed">"${t.text}"</p>
           <div class="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:${data.primaryColor}">${t.name[0]}</div>
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:${data.primaryColor}">${initial(t.name)}</div>
             <div><div class="text-sm font-semibold text-gray-900">${t.name}</div><div class="text-xs text-gray-500">${t.role}</div></div>
           </div>
         </div>
@@ -337,7 +404,9 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
         </div>
       </div>
       <div class="mt-6 text-center">
-        <a href="mailto:${content.contactInfo.email}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}"><i class="fas fa-envelope"></i> ${content.contactInfo.email}</a>
+        ${/^\[/.test(content.contactInfo.email)
+          ? `<span class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg" style="background:${data.primaryColor}"><i class="fas fa-envelope"></i> ${content.contactInfo.email}</span>`
+          : `<a href="mailto:${content.contactInfo.email}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}"><i class="fas fa-envelope"></i> ${content.contactInfo.email}</a>`}
       </div>
     </div>
   </section>

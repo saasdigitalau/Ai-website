@@ -21,7 +21,7 @@ export default async function SitesPage() {
           No websites yet
         </h2>
         <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
-          Build your first AI-generated website by describing your business
+          Build your first website by describing your business
         </p>
         <a
           href="/#builder"
