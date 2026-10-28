@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { stripe } from "@/lib/stripe";
 
 // GET /api/invoices/[id] — get single invoice
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -61,69 +60,4 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   await prisma.invoice.delete({ where: { id } });
   return NextResponse.json({ success: true });
-}
-
-// POST /api/invoices/[id]/pay — create Stripe payment link
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
-  const { id } = await params;
-  const url = new URL(req.url);
-
-  // Handle /pay subroute
-  if (!url.pathname.endsWith("/pay")) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const invoice = await prisma.invoice.findFirst({
-    where: { id, user: { clerkId: userId } },
-  });
-  if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-  if (!stripe) {
-    return NextResponse.json({ error: "Payments are not configured." }, { status: 503 });
-  }
-
-  try {
-    // Create a Stripe payment link
-    const paymentLink = await stripe.paymentLinks.create({
-      line_items: [
-        {
-          // @ts-ignore - Stripe SDK types for payment links use `price` ID but runtime accepts price_data
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Invoice ${invoice.invoiceNumber} - ${invoice.clientName}`,
-              description: `Payment for ${invoice.invoiceNumber}`,
-            },
-            unit_amount: invoice.amount,
-          },
-          quantity: 1,
-        },
-      ] as any,
-      after_completion: {
-        type: "redirect",
-        redirect: { url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/invoices/${invoice.id}?paid=true` },
-      },
-      metadata: {
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-      },
-    });
-
-    // Update invoice with payment link
-    const updated = await prisma.invoice.update({
-      where: { id },
-      data: {
-        stripePaymentLink: paymentLink.url,
-        stripePaymentLinkId: paymentLink.id,
-        status: "sent",
-      },
-    });
-
-    return NextResponse.json(updated);
-  } catch (error: any) {
-    console.error("Error creating payment link:", error);
-    return NextResponse.json({ error: error.message || "Failed to create payment link" }, { status: 500 });
-  }
 }
