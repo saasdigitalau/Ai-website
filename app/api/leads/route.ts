@@ -1,151 +1,480 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-// Mock business data for lead finder
-const BUSINESS_TYPES: Record<string, string[]> = {
-  restaurant: ["Italian", "Mexican", "Japanese", "Indian", "Thai", "American", "French", "Chinese", "Greek", "Vietnamese"],
-  gym: ["CrossFit", "Yoga", "Pilates", "Weight Training", "Martial Arts", "Cycling", "Boxing", "Dance"],
-  salon: ["Hair Salon", "Barbershop", "Nail Salon", "Day Spa", "Tanning Salon", "Brow & Lash Studio"],
-  dentist: ["General Dentistry", "Orthodontics", "Pediatric Dentistry", "Cosmetic Dentistry", "Oral Surgery"],
-  yoga: ["Hatha Yoga", "Vinyasa Yoga", "Hot Yoga", "Restorative Yoga", "Power Yoga", "Yin Yoga"],
-  general: ["Boutique", "Cafe", "Baker", "Food Truck", "Fitness Coach", "Photographer", "Consultant", "Handyman", "Pet Services", "Tutoring"],
+// ---------------------------------------------------------------------------
+// Lead Finder API
+//
+// Live results are looked up from the Google Places API (Text Search), behind
+// the GOOGLE_PLACES_API_KEY env var. When that key is not configured we return
+// an explicit "not_configured" response (503) — we never invent businesses,
+// phone numbers, emails, addresses, ratings or review counts.
+//
+// A real (non-demo) search requires a signed-in Clerk user: Google Places
+// calls are billed per request, so an anonymous caller must never be able to
+// spend our quota. Unauthenticated real searches get 401. Demo mode (demo=1)
+// is the only path that works without a session — it is clearly labelled
+// sample data and costs nothing.
+//
+// Check order for a GET: (1) missing "query" → 400, (2) demo=1 → sample data,
+// (3) no signed-in user → 401, (4) no/invalid Google Places key → 503
+// not_configured, (5) real Places results. Because the auth gate runs before
+// the provider check, an anonymous caller always sees 401 rather than 503.
+//
+// Demo mode is strictly opt-in: the client must pass demo=1 (the dashboard
+// only sends it after the user clicks a clearly labelled "Preview with sample
+// data" button). Every demo payload carries { demo: true } with each lead
+// marked sample: true, and the UI is required to show a persistent
+// "Sample data — not real businesses" banner while demo results are visible.
+//
+// Google Places does not provide email addresses or social links. Those fields
+// are returned as null and the UI renders "Not listed" — nothing is fabricated
+// to fill them in.
+// ---------------------------------------------------------------------------
+
+export const dynamic = "force-dynamic";
+
+const PLACES_API = "https://places.googleapis.com/v1/places:searchText";
+
+const PLACES_FIELDS = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.internationalPhoneNumber",
+  "places.websiteUri",
+  "places.rating",
+  "places.userRatingCount",
+  "places.priceLevel",
+  "places.currentOpeningHours",
+  "places.types",
+  "places.businessStatus",
+  "nextPageToken",
+].join(",");
+
+interface PlacesResult {
+  id?: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: string;
+  currentOpeningHours?: { openNow?: boolean };
+  types?: string[];
+  businessStatus?: string;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  businessType: string;
+  location: string;
+  rating: string | null;
+  reviewCount: number | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  hasWebsite: boolean;
+  websiteUrl: string | null;
+  socialLinks: { instagram: null; facebook: null };
+  priceRange: string | null;
+  openNow: boolean | null;
+  sample: boolean;
+}
+
+const PRICE_LEVELS: Record<string, string> = {
+  PRICE_LEVEL_FREE: "Free",
+  PRICE_LEVEL_INEXPENSIVE: "$",
+  PRICE_LEVEL_MODERATE: "$$",
+  PRICE_LEVEL_EXPENSIVE: "$$$",
+  PRICE_LEVEL_VERY_EXPENSIVE: "$$$$",
 };
 
-const LOCATIONS = [
-  "Austin, TX", "Los Angeles, CA", "New York, NY", "Chicago, IL", "Miami, FL",
-  "San Francisco, CA", "Seattle, WA", "Denver, CO", "Boston, MA", "Portland, OR",
-  "Atlanta, GA", "Dallas, TX", "Houston, TX", "Phoenix, AZ", "San Diego, CA",
-  "Nashville, TN", "Charlotte, NC", "Minneapolis, MN", "Tampa, FL", "Orlando, FL",
-];
+function prettifyType(raw: string): string {
+  return raw
+    .split("_")
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w))
+    .join(" ");
+}
 
-const FIRST_NAMES = ["Luna", "Oliver", "Aria", "Leo", "Mia", "Noah", "Zoe", "Liam", "Ivy", "Finn", "Ella", "Mason", "Stella", "Lucas", "Nova"];
-const LAST_NAMES = ["Smith", "Rivera", "Chen", "Patel", "Kim", "Singh", "Johnson", "Garcia", "Brown", "Lee", "Davis", "Martinez", "Wilson", "Anderson", "Taylor"];
+function mapPlace(place: PlacesResult, location: string): Lead {
+  const name = place.displayName?.text?.trim() || "Unnamed business";
+  const websiteUrl = place.websiteUri || null;
+  return {
+    id: place.id || `place-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name,
+    businessType: place.types && place.types.length > 0 ? prettifyType(place.types[0]) : "Local business",
+    location,
+    rating: typeof place.rating === "number" ? place.rating.toFixed(1) : null,
+    reviewCount: typeof place.userRatingCount === "number" ? place.userRatingCount : null,
+    phone: place.internationalPhoneNumber || null,
+    email: null, // Google Places does not provide email addresses.
+    address: place.formattedAddress || null,
+    hasWebsite: Boolean(websiteUrl),
+    websiteUrl,
+    socialLinks: { instagram: null, facebook: null }, // Not available from Google Places — never invented.
+    priceRange: PRICE_LEVELS[place.priceLevel ?? ""] ?? null,
+    openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
+    sample: false,
+  };
+}
 
-function generateMockBusinesses(type: string, location: string, count: number = 20) {
-  const types = BUSINESS_TYPES[type] || BUSINESS_TYPES.general;
-  const businesses = [];
-  
-  for (let i = 0; i < count; i++) {
-    const bizType = types[i % types.length];
-    const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-    const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
-    const name = `${firstName}&#39;s ${bizType}`;
-    const hasWebsite = Math.random() > 0.45; // ~55% without website
-    
-    businesses.push({
-      id: `lead-${i + 1}-${Date.now()}`,
-      name,
-      businessType: bizType,
-      location,
-      rating: (3.5 + Math.random() * 1.5).toFixed(1),
-      reviewCount: Math.floor(Math.random() * 150) + 5,
-      phone: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0")}`,
-      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${bizType.toLowerCase().replace(/\s+/g, "")}.com`,
-      address: `${Math.floor(Math.random() * 9000) + 100} ${["Main St", "Oak Ave", "Maple Dr", "Broadway", "Park Blvd", "Cedar Ln", "Lake Dr", "River Rd", "Elm St", "Pine St"][Math.floor(Math.random() * 10)]}, ${location}`,
-      hasWebsite,
-      websiteUrl: hasWebsite ? `https://${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com` : null,
-      socialLinks: {
-        instagram: Math.random() > 0.3 ? `@${name.toLowerCase().replace(/[^a-z0-9]/g, "")}` : null,
-        facebook: Math.random() > 0.4 ? `${name.replace(/\s/g, "")}` : null,
-      },
-      ratingCount: Math.floor(Math.random() * 200) + 10,
-      priceRange: ["$", "$$", "$$$"][Math.floor(Math.random() * 3)],
-      openNow: Math.random() > 0.25,
-    });
+class NotConfiguredError extends Error {
+  constructor() {
+    super("Lead search is not configured yet.");
+    this.name = "NotConfiguredError";
+  }
+}
+
+// A failed call to the Google Places API. Kept as a distinct type so the
+// handler can return a short, user-safe error instead of leaking Google's
+// raw response body (which can contain keys/scope details) to the client.
+class PlacesApiError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`Google Places lookup failed (${status}).`);
+    this.name = "PlacesApiError";
+    this.status = status;
+  }
+}
+
+function isPlacesConfigError(status: number): boolean {
+  // 401/403 mean the API key is missing, invalid, not enabled, or out of
+  // quota — a configuration problem, so we surface the "not connected" state.
+  return status === 401 || status === 403;
+}
+
+async function fetchFromGooglePlaces(
+  textQuery: string,
+  location: string,
+  pageToken?: string
+): Promise<{ leads: Lead[]; nextPageToken: string | null }> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!key) throw new NotConfiguredError();
+
+  const body: Record<string, unknown> = { textQuery, pageSize: 20 };
+  if (pageToken) body.pageToken = pageToken;
+
+  const res = await fetch(PLACES_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": PLACES_FIELDS,
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    // Log the full response server-side for debugging; never send it to the browser.
+    console.error(`Google Places API error ${res.status}: ${detail.slice(0, 500) || res.statusText}`);
+    throw new PlacesApiError(res.status);
   }
 
-  // Sort: businesses without websites first
-  businesses.sort((a, b) => Number(a.hasWebsite) - Number(b.hasWebsite));
-  
-  return businesses;
+  const data = await res.json();
+  const leads: Lead[] = (Array.isArray(data.places) ? data.places : []).map((p: PlacesResult) =>
+    mapPlace(p, location)
+  );
+  const nextPageToken: string | null = typeof data.nextPageToken === "string" ? data.nextPageToken : null;
+  return { leads, nextPageToken };
+}
+
+// ---------------------------------------------------------------------------
+// Opt-in sample data. Served ONLY when the client explicitly requests demo=1.
+// Every lead is sample: true, and the UI shows a persistent
+// "Sample data — not real businesses" banner while these are visible. Demo
+// rows use clearly fictional details (555 phone numbers, example.com email
+// domains) so they can never be mistaken for real businesses.
+// ---------------------------------------------------------------------------
+
+const DEMO_LEADS: Omit<Lead, "sample">[] = [
+  {
+    id: "sample-1",
+    name: "Example Coffee Shop",
+    businessType: "Cafe",
+    location: "Austin, TX",
+    rating: "4.6",
+    reviewCount: 212,
+    phone: "(555) 010-1201",
+    email: "hello@example-coffee.com",
+    address: "123 Sample St, Austin, TX",
+    hasWebsite: false,
+    websiteUrl: null,
+    socialLinks: { instagram: null, facebook: null },
+    priceRange: "$",
+    openNow: true,
+  },
+  {
+    id: "sample-2",
+    name: "Example Yoga Studio",
+    businessType: "Yoga Studio",
+    location: "Austin, TX",
+    rating: "4.8",
+    reviewCount: 96,
+    phone: "(555) 010-1202",
+    email: "hello@example-yoga.com",
+    address: "456 Sample Ave, Austin, TX",
+    hasWebsite: false,
+    websiteUrl: null,
+    socialLinks: { instagram: null, facebook: null },
+    priceRange: "$$",
+    openNow: null,
+  },
+  {
+    id: "sample-3",
+    name: "Example Hair Salon",
+    businessType: "Hair Salon",
+    location: "Austin, TX",
+    rating: "4.3",
+    reviewCount: 150,
+    phone: "(555) 010-1203",
+    email: "hello@example-salon.com",
+    address: "789 Sample Blvd, Austin, TX",
+    hasWebsite: false,
+    websiteUrl: null,
+    socialLinks: { instagram: null, facebook: null },
+    priceRange: "$$",
+    openNow: false,
+  },
+  {
+    id: "sample-4",
+    name: "Example Dental Clinic",
+    businessType: "Dentist",
+    location: "Austin, TX",
+    rating: "4.9",
+    reviewCount: 310,
+    phone: "(555) 010-1204",
+    email: "hello@example-dental.com",
+    address: "101 Sample Rd, Austin, TX",
+    hasWebsite: true,
+    websiteUrl: "https://example-dental.com",
+    socialLinks: { instagram: null, facebook: null },
+    priceRange: "$$$",
+    openNow: null,
+  },
+  {
+    id: "sample-5",
+    name: "Example Gym",
+    businessType: "Gym",
+    location: "Austin, TX",
+    rating: "4.5",
+    reviewCount: 278,
+    phone: "(555) 010-1205",
+    email: "hello@example-gym.com",
+    address: "222 Sample Dr, Austin, TX",
+    hasWebsite: false,
+    websiteUrl: null,
+    socialLinks: { instagram: null, facebook: null },
+    priceRange: "$$",
+    openNow: true,
+  },
+  {
+    id: "sample-6",
+    name: "Example Pet Services",
+    businessType: "Pet Services",
+    location: "Austin, TX",
+    rating: "4.7",
+    reviewCount: 64,
+    phone: "(555) 010-1206",
+    email: "hello@example-pets.com",
+    address: "333 Sample Ln, Austin, TX",
+    hasWebsite: true,
+    websiteUrl: "https://example-pets.com",
+    socialLinks: { instagram: null, facebook: null },
+    priceRange: "$",
+    openNow: null,
+  },
+];
+
+function demoLeads(query: string, location: string): Lead[] {
+  const all = DEMO_LEADS.map((l) => ({ ...l, location: location || l.location, sample: true }));
+  const q = query.toLowerCase().trim();
+  if (!q) return all;
+  // Match the sample set loosely to the query ("restaurants" ~ "restaurant"),
+  // but never return an empty demo: an empty "sample data" preview looks like a
+  // broken feature rather than a labelled example.
+  const singular = q.replace(/(es|s)$/, "");
+  const matches = all.filter((l) => {
+    const haystack = `${l.name} ${l.businessType} ${l.businessType.replace(/s$/, "")}`.toLowerCase();
+    return haystack.includes(q) || haystack.includes(singular);
+  });
+  return matches.length > 0 ? matches : all;
+}
+
+function toCSV(leads: Lead[], demo: boolean): string {
+  const header =
+    "Name,Business Type,Location,Rating,Reviews,Phone,Email,Address,Has Website,Website URL,Price Range,Open Now";
+  const rows = leads.map((b) =>
+    [
+      `"${b.name}"`,
+      `"${b.businessType}"`,
+      `"${b.location}"`,
+      b.rating ?? "",
+      b.reviewCount ?? "",
+      `"${b.phone ?? ""}"`,
+      `"${b.email ?? ""}"`,
+      `"${b.address ?? ""}"`,
+      b.hasWebsite ? "Yes" : "No",
+      b.websiteUrl ?? "",
+      b.priceRange ?? "",
+      b.openNow === null ? "" : b.openNow ? "Yes" : "No",
+    ].join(",")
+  );
+  const sampleMarker = demo ? "# SAMPLE DATA - NOT REAL BUSINESSES\n" : "";
+  return sampleMarker + header + "\n" + rows.join("\n");
+}
+
+function sanitizeSlug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "leads";
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("query") || "";
-    const location = searchParams.get("location") || "";
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 50);
+    const query = searchParams.get("query")?.trim() || "";
+    const location = searchParams.get("location")?.trim() || "";
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10) || 20, 20);
+    const pageToken = searchParams.get("pageToken") || undefined;
     const format = searchParams.get("format");
+    const demo = searchParams.get("demo") === "1";
 
-    // Normalize query
-    const normalizedQuery = query.toLowerCase().trim();
-    const matchedKey = Object.keys(BUSINESS_TYPES).find(
-      (key) => normalizedQuery.includes(key) || BUSINESS_TYPES[key].some(t => normalizedQuery.includes(t.toLowerCase()))
-    ) || "general";
+    if (!query) {
+      return NextResponse.json({ status: "error", error: "Enter a business type to search." }, { status: 400 });
+    }
 
-    // Generate mock data
-    const allResults = generateMockBusinesses(matchedKey, location || "Austin, TX");
-    const totalResults = allResults.length;
-    const noWebsiteCount = allResults.filter((b) => !b.hasWebsite).length;
-
-    // Paginate
-    const startIndex = (page - 1) * limit;
-    const paginatedResults = allResults.slice(startIndex, startIndex + limit);
-
-    // Try to save search to DB if auth is configured
-    try {
-      let userId = null;
-      try {
-        const { userId: uid } = await auth();
-        userId = uid;
-      } catch { /* auth not configured */ }
-
-      if (userId) {
-        const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
-        if (dbUser) {
-          await prisma.leadSearch.create({
-            data: {
-              userId: dbUser.id,
-              query: query || matchedKey,
-              location: location || null,
-              results: paginatedResults,
-              count: totalResults,
-            },
-          });
-        }
+    // ---- Opt-in demo mode (explicit demo=1 from the labelled UI button) ----
+    if (demo) {
+      const leads = demoLeads(query, location).slice(0, limit);
+      const noWebsiteCount = leads.filter((b) => !b.hasWebsite).length;
+      if (format === "csv") {
+        return new NextResponse(toCSV(leads, true), {
+          headers: {
+            "Content-Type": "text/csv",
+            "Content-Disposition": `attachment; filename="sample-leads-${sanitizeSlug(query)}.csv"`,
+          },
+        });
       }
-    } catch { /* db not configured, skip */ }
+      return NextResponse.json({
+        status: "ok",
+        demo: true,
+        results: leads,
+        pagination: {
+          page: 1,
+          limit,
+          total: leads.length,
+          totalPages: 1,
+          noWebsiteCount,
+          nextPageToken: null,
+        },
+        query,
+        location: location || "Austin, TX",
+      });
+    }
 
-    // CSV export
+    // ---- Live provider: Google Places (GOOGLE_PLACES_API_KEY) ----
+    // Real searches spend paid Google Places quota, so they require a signed-in
+    // user. Demo mode above is the only unauthenticated path.
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        {
+          status: "unauthorized",
+          error: "Sign in to search real local businesses.",
+        },
+        { status: 401 }
+      );
+    }
+
+    let leads: Lead[] = [];
+    let nextPageToken: string | null = null;
+    try {
+      const textQuery = location ? `${query} in ${location}` : query;
+      const fetched = await fetchFromGooglePlaces(textQuery, location || "Austin, TX", pageToken);
+      leads = fetched.leads;
+      nextPageToken = fetched.nextPageToken;
+    } catch (err) {
+      if (err instanceof NotConfiguredError) {
+        return NextResponse.json(
+          {
+            status: "not_configured",
+            error:
+              "Lead search is not connected yet. Live results are looked up from Google Places once the search key is configured.",
+          },
+          { status: 503 }
+        );
+      }
+      if (err instanceof PlacesApiError) {
+        if (isPlacesConfigError(err.status)) {
+          return NextResponse.json(
+            {
+              status: "not_configured",
+              error:
+                "Lead search is not connected yet. The Google Places search key is missing, invalid, or has run out of quota — check the configured key and try again.",
+            },
+            { status: 503 }
+          );
+        }
+        return NextResponse.json({ status: "error", error: err.message }, { status: 502 });
+      }
+      throw err;
+    }
+
+    // Businesses showing no website first — that is the point of the tool.
+    leads.sort((a, b) => Number(a.hasWebsite) - Number(b.hasWebsite));
+    const pageLeads = leads.slice(0, limit);
+    const noWebsiteCount = pageLeads.filter((b) => !b.hasWebsite).length;
+
     if (format === "csv") {
-      const csvHeader = "Name,Business Type,Location,Rating,Reviews,Phone,Email,Address,Has Website,Website URL,Instagram,Facebook,Price Range,Open Now\n";
-      const csvRows = allResults.map((b) =>
-        [
-          `"${b.name}"`, `"${b.businessType}"`, `"${b.location}"`,
-          b.rating, b.reviewCount, `"${b.phone}"`, `"${b.email}"`,
-          `"${b.address}"`, b.hasWebsite ? "Yes" : "No",
-          b.websiteUrl || "", b.socialLinks.instagram || "",
-          b.socialLinks.facebook || "", b.priceRange,
-          b.openNow ? "Yes" : "No",
-        ].join(",")
-      ).join("\n");
-
-      return new NextResponse(csvHeader + csvRows, {
+      return new NextResponse(toCSV(pageLeads, false), {
         headers: {
           "Content-Type": "text/csv",
-          "Content-Disposition": `attachment; filename="leads-${matchedKey}-${(location || "austin-tx").replace(/[^a-zA-Z0-9]/g, "-")}.csv"`,
+          "Content-Disposition": `attachment; filename="leads-${sanitizeSlug(query)}-${sanitizeSlug(location || "local")}.csv"`,
         },
       });
     }
 
+    // Best-effort: record the search for future CRM use. The caller is already
+    // authenticated above; the DB may still be unconfigured, in which case the
+    // results are returned without being logged.
+    try {
+      const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
+      if (dbUser) {
+        await prisma.leadSearch.create({
+          data: {
+            userId: dbUser.id,
+            query,
+            location: location || null,
+            results: pageLeads as unknown as Prisma.InputJsonValue,
+            count: pageLeads.length,
+          },
+        });
+      }
+    } catch {
+      /* DB not configured — search results are still returned */
+    }
+
     return NextResponse.json({
-      results: paginatedResults,
+      status: "ok",
+      demo: false,
+      results: pageLeads,
       pagination: {
-        page, limit, total: totalResults,
-        totalPages: Math.ceil(totalResults / limit),
+        page: 1,
+        limit,
+        total: pageLeads.length,
+        totalPages: 1,
         noWebsiteCount,
+        nextPageToken,
       },
-      query: query || matchedKey,
+      query,
       location: location || "Austin, TX",
     });
   } catch (error) {
     console.error("Leads API error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch leads. Please try again." },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to fetch leads.";
+    return NextResponse.json({ status: "error", error: `Failed to fetch leads: ${message}` }, { status: 502 });
   }
 }

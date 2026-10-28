@@ -180,10 +180,10 @@ export default function Home() {
               Lead Finder
             </div>
             <h2 className="font-heading text-4xl md:text-5xl font-extrabold leading-[0.98] tracking-tight text-gray-900">Find local customers <br/><span className="text-gradient">in seconds.</span></h2>
-            <p className="mt-5 text-gray-500 leading-relaxed max-w-lg">Included with every plan: pull 200M+ local businesses from Google. Phone, email, address — auto-flagged when they don&apos;t have a website.</p>
+            <p className="mt-5 text-gray-500 leading-relaxed max-w-lg">Included with every plan: Lead Finder searches real local businesses through Google Places — name, phone, address and rating, auto-flagged when their listing shows no website. Google Places search is not connected yet — it switches on shortly, and until then the dashboard shows clearly labelled sample data.</p>
             <ul className="mt-7 space-y-3">
               {[
-                ["200M+ businesses, live data", "— Google Business + AI enrichment."],
+                ["Google Places business search", "— Real local businesses with phone, address and rating, flagged when their listing shows no website. Not switched on yet."],
                 ["No-website flag", "— Sort straight to your hottest prospects."],
                 ["Build them a page in seconds", "— Turn a lead into a customer in the same tab."]
               ].map(([a, b]) => (
@@ -195,7 +195,7 @@ export default function Home() {
             </ul>
             <a href="/sign-up" className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:brightness-110 transition-all shadow-md">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3.5 w-3.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-              Search live leads in your dashboard
+              Find leads in your dashboard
             </a>
           </div>
           <div className="bg-white rounded-3xl shadow-lg border overflow-hidden">
@@ -360,8 +360,8 @@ export default function Home() {
           <div className="space-y-2">
             {[
               ["What kinds of pages can SiteLaunch build?", "Landing pages for any kind of small business — restaurants, gyms, salons, freelancers, services, events, online stores. If a customer needs to find you online, we can build it."],
-              ["Do I need to know how to code?", "Not at all. Just describe your business in plain English. Our AI handles all the design and development. You can customize colors, text, and images without touching code."],
-              ["How does Lead Finder get its data?", "It pulls from Google Business profiles and AI enrichment. We index 200M+ businesses, flag which ones lack a website, and surface their contact info so you can reach out."],
+              ["Do I need to know how to code?", "Not at all. Just describe your business in plain English and we generate a complete, ready-to-publish site for you — instant, guided generation, no coding at any point. You can customize colors, text, and images without touching code."],
+              ["How does Lead Finder get its data?", "It searches real local businesses through Google Places and flags the ones whose listing shows no website — name, phone, address, and rating, so you can reach out before your competitors do. Google Places search is not connected yet: it switches on shortly, and until then the dashboard shows clearly labelled sample data."],
               ["How does invoicing work?", "Create a professional invoice with line items, send it as a PDF or link, and track payment status (paid/pending/overdue). Your clients pay you directly — no processing fees."]
             ].map(([q, a]) => (
               <details key={q} className="overflow-hidden rounded-2xl bg-white ring-1 ring-gray-100">
