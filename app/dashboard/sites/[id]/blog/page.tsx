@@ -239,7 +239,7 @@ export default function BlogDashboard() {
           <FileText className="h-12 w-12 text-gray-200 mx-auto mb-4" />
           <h2 className="font-heading text-xl font-bold text-gray-900 mb-2">No blog posts yet</h2>
           <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
-            Generate AI-powered blog posts to boost your SEO and engage your audience
+            Generate blog posts shaped for search to boost your SEO and engage your audience
           </p>
           <button
             onClick={() => generatePosts(3)}

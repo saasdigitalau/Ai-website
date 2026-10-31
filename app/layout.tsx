@@ -12,7 +12,7 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "SiteLaunch AI — A Website in One Sentence",
   description:
-    "Describe your business, get a beautiful AI-generated website. Find leads without websites. Invoice clients — all from one platform.",
+    "Describe your business, get a professional website from a ready-made template. Find leads without websites. Invoice clients — all from one platform.",
 };
 
 export default function RootLayout({
