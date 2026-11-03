@@ -49,7 +49,7 @@ export default async function DashboardPage() {
       color: "from-orange-500 to-amber-500",
     },
     {
-      label: "AI Credits Used",
+      label: "Site Credits Used",
       value: `${dbUser?.aiCredits ?? 0}`,
       icon: TrendingUp,
       href: "/dashboard/settings",
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
           </div>
           <div className="text-xs text-gray-400">
             {dbUser?.plan === "free"
-              ? "Upgrade to unlock AI credits, lead searches, and more."
+              ? "Upgrade to unlock site credits, lead searches, and more."
               : "You're on a paid plan. Manage your subscription anytime."}
           </div>
         </div>

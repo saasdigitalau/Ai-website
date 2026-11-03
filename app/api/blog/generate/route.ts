@@ -118,10 +118,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Deduct AI credits
+    // Deduct site credits
     const creditsNeeded = count;
     if (dbUser.aiCredits < creditsNeeded && dbUser.plan !== "business") {
-      return NextResponse.json({ error: "Insufficient AI credits" }, { status: 402 });
+      return NextResponse.json({ error: "Insufficient site credits" }, { status: 402 });
     }
 
     const generated = Math.min(count, 5);

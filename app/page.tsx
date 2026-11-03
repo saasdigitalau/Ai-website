@@ -282,9 +282,9 @@ export default function Home() {
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {[
-              { name: "Starter", price: "$25", features: ["Instant site generation", "100 AI credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false },
-              { name: "Pro", price: "$50", features: ["Instant site generation", "200 AI credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: true },
-              { name: "Business", price: "$100", features: ["Instant site generation", "500 AI credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false }
+              { name: "Starter", price: "A$25", features: ["Instant site generation", "100 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false },
+              { name: "Pro", price: "A$50", features: ["Instant site generation", "200 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: true },
+              { name: "Business", price: "A$100", features: ["Instant site generation", "500 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false }
             ].map((plan) => (
               <div key={plan.name} className={`relative rounded-3xl p-8 transition-all ${
                 plan.popular 
