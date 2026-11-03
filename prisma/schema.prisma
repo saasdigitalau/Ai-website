@@ -16,6 +16,13 @@ model User {
   stripeCustomerId String?
   stripeSubscriptionId String?
   subscriptionStatus String? // active, past_due, canceled, etc.
+  // Razorpay subscriptions (AUD, monthly). The subscription id is recorded at
+  // checkout so the signature-verified webhook can find the user; plan and
+  // subscriptionStatus are written only by that webhook.
+  razorpayCustomerId     String?
+  razorpaySubscriptionId String?  @unique
+  razorpayPlanId         String?
+  subscriptionEndsAt     DateTime?
   aiCredits     Int       @default(0)
   whiteLabel    Boolean   @default(false) // Remove SiteLaunch branding from client portal
   whiteLabelLogo String?  // Custom logo URL for white-label
@@ -165,4 +172,17 @@ model SocialSnippet {
   createdAt      DateTime @default(now())
 
   website Website @relation(fields: [websiteId], references: [id])
+}
+
+// One Razorpay plan per subscription tier, created through the Plans API the
+// first time a tier is checked out and reused from here afterwards. Set
+// RAZORPAY_PLAN_STARTER / _PRO / _BUSINESS to skip creation entirely.
+model RazorpayPlan {
+  tier      String   @id // starter, pro, business
+  planId    String   @unique
+  amount    Int      // cents, AUD
+  currency  String   @default("AUD")
+  period    String   @default("monthly")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
