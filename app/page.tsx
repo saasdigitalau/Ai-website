@@ -1,12 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  CardPaymentsNotConnected,
+  SubscriptionPending,
+  useSubscriptionCheckout,
+  type SubscriptionTier,
+} from "@/components/subscription-checkout";
 
 export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [generatedSite, setGeneratedSite] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  // Plan buttons start a real Razorpay checkout; the plan itself is only ever
+  // granted by the signature-verified webhook, never from this page.
+  const { startCheckout, startingTier, cardPaymentsConnected, awaitingConfirmation } =
+    useSubscriptionCheckout();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -288,14 +298,14 @@ export default function Home() {
           <div className="text-center mb-10">
             <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Pricing</p>
             <h2 className="mt-3 font-heading text-4xl font-extrabold text-gray-900">Choose Your <span className="text-gradient">Plan</span></h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-gray-500">Planned prices, not live charges: checkout is not connected yet, so nothing is billed today. Search quotas are not enforced yet either — for now lead searches are fair use.</p>
+            <p className="mx-auto mt-3 max-w-xl text-sm text-gray-500">Prices are in AUD per month. Your plan changes only after a card payment is confirmed by our payment provider — nothing is charged until you complete checkout. Search quotas are not enforced yet, so for now lead searches are fair use.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
-              { name: "Starter", price: "A$25", features: ["Instant site generation", "100 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false },
-              { name: "Pro", price: "A$50", features: ["Instant site generation", "200 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: true },
-              { name: "Business", price: "A$100", features: ["Instant site generation", "500 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false }
-            ].map((plan) => (
+            {([
+              { tier: "starter", name: "Starter", price: "A$25", features: ["Instant site generation", "100 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false },
+              { tier: "pro", name: "Pro", price: "A$50", features: ["Instant site generation", "200 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: true },
+              { tier: "business", name: "Business", price: "A$100", features: ["Instant site generation", "500 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false }
+            ] as { tier: SubscriptionTier; name: string; price: string; features: string[]; popular: boolean }[]).map((plan) => (
               <div key={plan.name} className={`relative rounded-3xl p-8 transition-all ${
                 plan.popular 
                   ? "bg-gradient-to-b from-indigo-500 to-purple-700 text-white shadow-2xl shadow-indigo-500/25 scale-105"
@@ -318,16 +328,27 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <a href="/sign-up" className={`mt-8 block w-full rounded-2xl py-3.5 text-center font-heading text-sm font-semibold transition-all ${
-                  plan.popular 
-                    ? "bg-white text-indigo-600 shadow-lg hover:bg-white/90" 
+                <button
+                  type="button"
+                  onClick={() => startCheckout(plan.tier)}
+                  disabled={startingTier !== null}
+                  className={`mt-8 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-center font-heading text-sm font-semibold transition-all disabled:opacity-50 ${
+                  plan.popular
+                    ? "bg-white text-indigo-600 shadow-lg hover:bg-white/90"
                     : "border border-gray-200 text-gray-900 hover:border-indigo-200 hover:bg-indigo-50/50"
-                }`}>Get Started</a>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+                }`}>
+                  {startingTier === plan.tier && (
+                    <span className={`h-4 w-4 animate-spin rounded-full border-2 border-t-transparent ${plan.popular ? "border-indigo-600" : "border-gray-900"}`} />
+                  )}
+                  Choose {plan.name}
+                </button>
+                </div>
+                ))}
+                </div>
+                {cardPaymentsConnected === false && <CardPaymentsNotConnected className="mt-8 max-w-4xl mx-auto" />}
+                {awaitingConfirmation && <SubscriptionPending className="mt-8 max-w-4xl mx-auto" />}
+                </div>
+                </section>
 
       {/* FAQ */}
       <section className="py-20 px-6 bg-gray-50/50">

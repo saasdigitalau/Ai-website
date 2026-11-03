@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { UserButton } from "@clerk/nextjs";
 import WhiteLabelSettings from "@/components/white-label-settings";
+import PlanUpgrade from "@/components/plan-upgrade";
 
 export default async function SettingsPage() {
   const user = await currentUser();
@@ -42,20 +43,15 @@ export default async function SettingsPage() {
           <h2 className="font-heading text-lg font-bold text-gray-900 mb-4">
             Plan & Billing
           </h2>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm text-gray-500">Current Plan</div>
               <div className="text-xl font-extrabold text-gray-900 capitalize">
                 {dbUser?.plan || "Free"}
               </div>
             </div>
-            <a
-              href="/#pricing"
-              className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600"
-            >
-              {dbUser?.plan === "free" ? "Upgrade" : "Manage"}
-            </a>
           </div>
+          <PlanUpgrade currentPlan={dbUser?.plan || "free"} />
           <div className="mt-4 text-xs text-gray-400">
             Site Credits: {dbUser?.aiCredits ?? 0}
           </div>
