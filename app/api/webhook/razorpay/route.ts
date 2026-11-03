@@ -8,20 +8,27 @@ import {
   verifyWebhookSignature,
   type RazorpayWebhookEvent,
 } from "@/lib/razorpay";
+import { applySubscriptionEvent, isSubscriptionEvent } from "@/lib/razorpay-subscriptions";
 
 // ---------------------------------------------------------------------------
-// POST /api/webhook/razorpay — the ONLY place an invoice becomes paid.
+// POST /api/webhook/razorpay — the ONLY place an invoice becomes paid, and the
+// only place a subscription grants a plan.
 //
 // The raw request body is verified against the x-razorpay-signature header with
-// RAZORPAY_WEBHOOK_SECRET, then the captured payment is matched to the invoice
-// whose razorpayOrderId equals the payment's order_id. The amount and the AUD
-// currency must match the invoice before the status is flipped, so a verified
-// notification for a different sum cannot mark an invoice paid.
+// RAZORPAY_WEBHOOK_SECRET before anything is read from it. Then:
+//
+//  * payment.captured / order.paid → match the invoice whose razorpayOrderId
+//    equals the payment's order_id, require the amount and AUD currency to
+//    match, and flip it to paid.
+//  * subscription.activated / subscription.charged / subscription.cancelled →
+//    update the owning user's plan and subscriptionStatus.
+//  * anything else verified → acknowledged with handled:false, nothing written.
 //
 // No secret configured → 503 not_connected (an explicit state, not a crash).
 // Bad or missing signature → 400, and nothing is written.
 // Unsigned "?paid=true"-style shortcuts are not possible here: there is no
-// code path that writes status "paid" without a valid signature.
+// code path that writes status "paid" or grants a plan without a valid
+// signature.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -57,7 +64,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verified, but not a payment notification: acknowledge and change nothing.
+  // Verified subscription lifecycle events: plan changes are written from here
+  // and nowhere else.
+  if (isSubscriptionEvent(event.event)) {
+    const result = await applySubscriptionEvent(event);
+    return NextResponse.json({
+      received: true,
+      event: event.event,
+      ...result,
+    });
+  }
+
+  // Verified, but not an event we act on: acknowledge and change nothing.
   if (!isPaidEvent(event.event)) {
     return NextResponse.json({ received: true, event: event.event ?? null, handled: false });
   }

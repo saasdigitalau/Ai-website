@@ -25,6 +25,8 @@ import crypto from "node:crypto";
 export const RAZORPAY_CURRENCY = "AUD";
 
 const ORDERS_API = "https://api.razorpay.com/v1/orders";
+const PLANS_API = "https://api.razorpay.com/v1/plans";
+const SUBSCRIPTIONS_API = "https://api.razorpay.com/v1/subscriptions";
 
 export const NOT_CONNECTED_MESSAGE =
   "Card payments are not connected yet. Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET to switch them on.";
@@ -75,41 +77,28 @@ export type RazorpayOrder = {
   receipt?: string | null;
 };
 
-/**
- * Create a Razorpay order for `amount` minor units (cents) in AUD.
- * Throws RazorpayNotConnectedError when no keys are configured.
- */
-export async function createRazorpayOrder(params: {
-  amount: number;
-  receipt: string;
-  notes?: Record<string, string>;
-}): Promise<RazorpayOrder> {
+function razorpayAuthorization(): string {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) throw new RazorpayNotConnectedError();
+  return `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
+}
 
-  const amount = Math.round(params.amount);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new RazorpayRequestError("Order amount must be greater than 0", 400);
-  }
-
-  const authorization = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
-
+/**
+ * POST to a Razorpay resource endpoint with Basic auth and turn every failure
+ * into a typed error. `what` names the resource in the error message ("order",
+ * "plan", "subscription").
+ */
+async function razorpayPost(url: string, body: unknown, what: string): Promise<any> {
   let res: Response;
   try {
-    res = await fetch(ORDERS_API, {
+    res = await fetch(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization,
+        authorization: razorpayAuthorization(),
       },
-      body: JSON.stringify({
-        amount,
-        currency: RAZORPAY_CURRENCY,
-        // Razorpay caps receipt at 40 characters; invoice numbers are INV-0001.
-        receipt: params.receipt.slice(0, 40),
-        notes: params.notes ?? {},
-      }),
+      body: JSON.stringify(body),
     });
   } catch (err: any) {
     throw new RazorpayRequestError(
@@ -130,10 +119,39 @@ export async function createRazorpayOrder(params: {
     const detail =
       data?.error?.description || data?.error?.reason || text?.slice(0, 200) || "no response body";
     throw new RazorpayRequestError(
-      `Razorpay refused the order (${res.status}): ${detail}`,
+      `Razorpay refused the ${what} (${res.status}): ${detail}`,
       res.status >= 400 && res.status < 500 ? 502 : res.status
     );
   }
+
+  return data;
+}
+
+/**
+ * Create a Razorpay order for `amount` minor units (cents) in AUD.
+ * Throws RazorpayNotConnectedError when no keys are configured.
+ */
+export async function createRazorpayOrder(params: {
+  amount: number;
+  receipt: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayOrder> {
+  const amount = Math.round(params.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new RazorpayRequestError("Order amount must be greater than 0", 400);
+  }
+
+  const data = await razorpayPost(
+    ORDERS_API,
+    {
+      amount,
+      currency: RAZORPAY_CURRENCY,
+      // Razorpay caps receipt at 40 characters; invoice numbers are INV-0001.
+      receipt: params.receipt.slice(0, 40),
+      notes: params.notes ?? {},
+    },
+    "order"
+  );
 
   return {
     id: String(data.id),
@@ -141,6 +159,120 @@ export async function createRazorpayOrder(params: {
     currency: String(data.currency || RAZORPAY_CURRENCY),
     status: String(data.status || "created"),
     receipt: data.receipt ?? null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Subscriptions
+//
+// Razorpay subscriptions are built from a *plan*: a plan fixes the amount,
+// currency and billing period, and a subscription is a customer's enrolment in
+// that plan. A plan id must exist at Razorpay before a subscription can be
+// created, so the tier catalogue lives in lib/razorpay-subscriptions.ts and
+// resolves (or creates) one plan id per tier.
+// ---------------------------------------------------------------------------
+
+export type RazorpayPlanEntity = {
+  id: string;
+  period: string;
+  interval: number;
+  item?: { name?: string; amount?: number; currency?: string };
+};
+
+export type RazorpaySubscriptionEntity = {
+  id: string;
+  plan_id?: string;
+  status?: string;
+  quantity?: number;
+  total_count?: number;
+  paid_count?: number;
+  current_start?: number | null;
+  current_end?: number | null;
+  charge_at?: number | null;
+  customer_id?: string | null;
+  short_url?: string | null;
+  notes?: Record<string, string>;
+};
+
+/** A monthly plan for `amount` minor units (cents) in AUD. */
+export async function createRazorpayPlan(params: {
+  name: string;
+  amount: number;
+  description?: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayPlanEntity> {
+  const amount = Math.round(params.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new RazorpayRequestError("Plan amount must be greater than 0", 400);
+  }
+
+  const data = await razorpayPost(
+    PLANS_API,
+    {
+      period: "monthly",
+      interval: 1,
+      item: {
+        name: params.name,
+        amount,
+        currency: RAZORPAY_CURRENCY,
+        description: params.description ?? "",
+      },
+      notes: params.notes ?? {},
+    },
+    "plan"
+  );
+
+  return {
+    id: String(data.id),
+    period: String(data.period || "monthly"),
+    interval: Number(data.interval || 1),
+    item: data.item,
+  };
+}
+
+/**
+ * Enrol a customer in `planId`. `totalCount` is the number of monthly cycles
+ * Razorpay is authorised to charge (its maximum is 100, i.e. just over eight
+ * years); it is required, so it is always sent explicitly.
+ */
+export async function createRazorpaySubscription(params: {
+  planId: string;
+  totalCount: number;
+  notes?: Record<string, string>;
+}): Promise<RazorpaySubscriptionEntity> {
+  if (!params.planId) {
+    throw new RazorpayRequestError("A plan id is required to start a subscription", 400);
+  }
+  const totalCount = Math.round(params.totalCount);
+  if (!Number.isFinite(totalCount) || totalCount <= 0) {
+    throw new RazorpayRequestError("A subscription needs at least one billing cycle", 400);
+  }
+
+  const data = await razorpayPost(
+    SUBSCRIPTIONS_API,
+    {
+      plan_id: params.planId,
+      total_count: totalCount,
+      quantity: 1,
+      customer_notify: 1,
+      notes: params.notes ?? {},
+    },
+    "subscription"
+  );
+
+  return {
+    id: String(data.id),
+    plan_id: data.plan_id ? String(data.plan_id) : params.planId,
+    status: data.status ? String(data.status) : "created",
+    quantity: Number(data.quantity || 1),
+    total_count: Number(data.total_count || totalCount),
+    paid_count: Number(data.paid_count || 0),
+    current_start: data.current_start ?? null,
+    current_end: data.current_end ?? null,
+    charge_at: data.charge_at ?? null,
+    customer_id: data.customer_id ?? null,
+    short_url: data.short_url ?? null,
+    notes: data.notes ?? {},
   };
 }
 
@@ -180,6 +312,7 @@ export type RazorpayWebhookEvent = {
   payload?: {
     payment?: { entity?: RazorpayPaymentEntity };
     order?: { entity?: { id?: string; amount?: number; currency?: string; status?: string } };
+    subscription?: { entity?: RazorpaySubscriptionEntity };
   };
 };
 
