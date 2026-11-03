@@ -94,6 +94,10 @@ model Invoice {
   pdfUrl      String?
   stripePaymentLink String?
   stripePaymentLinkId String?
+  // Razorpay is the live card provider; these are set when an order is created
+  // for this invoice and the payment is confirmed by the verified webhook.
+  razorpayOrderId   String?  @unique
+  razorpayPaymentId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
