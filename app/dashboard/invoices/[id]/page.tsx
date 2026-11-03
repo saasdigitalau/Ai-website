@@ -4,7 +4,34 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { ArrowLeft, Download, ExternalLink, Send, Trash2, Copy, Check } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Trash2, Copy, Check, CreditCard } from "lucide-react";
+
+// Minimal shape of the Razorpay Checkout instance we use.
+interface RazorpayCheckoutInstance {
+  open: () => void;
+  on: (event: string, handler: (payload: unknown) => void) => void;
+}
+type RazorpayConstructor = new (options: Record<string, unknown>) => RazorpayCheckoutInstance;
+
+const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+
+function loadRazorpayCheckout(): Promise<RazorpayConstructor> {
+  return new Promise((resolve, reject) => {
+    const existing = (window as unknown as { Razorpay?: RazorpayConstructor }).Razorpay;
+    if (existing) return resolve(existing);
+
+    const script = document.createElement("script");
+    script.src = RAZORPAY_CHECKOUT_SRC;
+    script.async = true;
+    script.onload = () => {
+      const ctor = (window as unknown as { Razorpay?: RazorpayConstructor }).Razorpay;
+      if (ctor) resolve(ctor);
+      else reject(new Error("Razorpay Checkout did not load"));
+    };
+    script.onerror = () => reject(new Error("Razorpay Checkout failed to load"));
+    document.body.appendChild(script);
+  });
+}
 
 interface Invoice {
   id: string;
@@ -34,8 +61,21 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
+  const [cardPaymentsConnected, setCardPaymentsConnected] = useState<boolean | null>(null);
+  const [startingCardPayment, setStartingCardPayment] = useState(false);
+  // Set once Razorpay Checkout reports a completed payment. The invoice stays
+  // unpaid here on purpose — only the signed webhook can mark it paid.
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
+  const checkCardPayments = async (invoiceId: string) => {
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/razorpay`);
+      const data = await res.json();
+      setCardPaymentsConnected(Boolean(data?.connected));
+    } catch {
+      setCardPaymentsConnected(false);
+    }
+  };
 
   const fetchInvoice = async () => {
     try {
@@ -43,6 +83,7 @@ export default function InvoiceDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setInvoice(data);
+        checkCardPayments(data.id);
       } else {
         toast.error("Invoice not found");
         router.push("/dashboard/invoices");
@@ -70,23 +111,57 @@ export default function InvoiceDetailPage() {
     } catch {}
   };
 
-  const handleGeneratePaymentLink = async () => {
+  const handlePayWithCard = async () => {
     if (!invoice) return;
-    setGeneratingPaymentLink(true);
+    setStartingCardPayment(true);
     try {
-      const res = await fetch(`/api/invoices/${invoice.id}/pay`, { method: "POST" });
-      if (res.ok) {
-        const updated = await res.json();
-        setInvoice(updated);
-        toast.success("Payment link created!");
-      } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to create payment link");
+      const res = await fetch(`/api/invoices/${invoice.id}/razorpay`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 503 || data?.connected === false) {
+        setCardPaymentsConnected(false);
+        return;
       }
+      if (!res.ok) {
+        toast.error(data?.error || "Could not start the card payment");
+        if (res.status === 409) fetchInvoice();
+        return;
+      }
+
+      setCardPaymentsConnected(true);
+
+      const Razorpay = await loadRazorpayCheckout();
+      const checkout = new Razorpay({
+        key: data.keyId,
+        order_id: data.orderId,
+        amount: data.amount,
+        currency: data.currency || "AUD",
+        name: "SiteLaunch AI",
+        description: `Invoice ${invoice.invoiceNumber}`,
+        prefill: {
+          name: invoice.clientName,
+          email: invoice.clientEmail,
+        },
+        theme: { color: "#10b981" },
+        handler: () => {
+          // Razorpay Checkout has taken the payment, but nothing here marks the
+          // invoice paid — the signature-verified webhook does that.
+          setAwaitingConfirmation(true);
+          toast.success("Payment submitted — waiting for confirmation");
+          setTimeout(fetchInvoice, 5000);
+        },
+        modal: {
+          ondismiss: () => toast("Card payment cancelled", { icon: "ℹ️" }),
+        },
+      });
+      checkout.on("payment.failed", () => {
+        toast.error("The card payment did not go through. Nothing has been charged to this invoice.");
+      });
+      checkout.open();
     } catch {
-      toast.error("Failed to create payment link");
+      toast.error("Could not open card payment");
     } finally {
-      setGeneratingPaymentLink(false);
+      setStartingCardPayment(false);
     }
   };
 
@@ -111,7 +186,7 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  const formatCurrency = (cents: number) => `A$${(cents / 100).toFixed(2)}`;
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("en-US", {
       month: "long",
@@ -229,10 +304,10 @@ export default function InvoiceDetailPage() {
                     {item.quantity}
                   </td>
                   <td className="py-3 text-sm text-gray-500 text-right">
-                    ${item.unitPrice.toFixed(2)}
+                    A${item.unitPrice.toFixed(2)}
                   </td>
                   <td className="py-3 text-sm font-bold text-gray-900 text-right">
-                    ${(item.quantity * item.unitPrice).toFixed(2)}
+                    A${(item.quantity * item.unitPrice).toFixed(2)}
                   </td>
                 </tr>
               ))}
@@ -260,20 +335,41 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
+      {/* Card payment status */}
+      {invoice.status !== "paid" && cardPaymentsConnected === false && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <div className="text-sm font-bold text-amber-900">Card payments are not connected yet</div>
+          <p className="text-sm text-amber-800 mt-1">
+            No card payments can be taken on this invoice yet. You can still record a payment manually
+            once you have been paid another way.
+          </p>
+        </div>
+      )}
+
+      {awaitingConfirmation && invoice.status !== "paid" && (
+        <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
+          <div className="text-sm font-bold text-blue-900">Payment submitted — being confirmed</div>
+          <p className="text-sm text-blue-800 mt-1">
+            Your card payment has gone through to the payment provider. This invoice will show as paid
+            once the payment is confirmed, which usually takes a moment. It is not marked paid yet.
+          </p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        {invoice.status === "pending" && (
+        {invoice.status !== "paid" && cardPaymentsConnected !== false && (
           <button
-            onClick={handleGeneratePaymentLink}
-            disabled={generatingPaymentLink}
+            onClick={handlePayWithCard}
+            disabled={startingCardPayment}
             className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 shadow-md hover:brightness-110 transition-all disabled:opacity-50"
           >
-            {generatingPaymentLink ? (
+            {startingCardPayment ? (
               <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
-              <Send className="h-4 w-4" />
+              <CreditCard className="h-4 w-4" />
             )}
-            Generate Payment Link
+            Pay with card
           </button>
         )}
 
