@@ -57,7 +57,7 @@ export default async function SettingsPage() {
             </a>
           </div>
           <div className="mt-4 text-xs text-gray-400">
-            AI Credits: {dbUser?.aiCredits ?? 0}
+            Site Credits: {dbUser?.aiCredits ?? 0}
           </div>
         </div>
 

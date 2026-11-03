@@ -55,6 +55,12 @@ fail_if_present app/page.tsx 'custom domains?|built-in hosting|hosting is built-
 fail_if_present app 'AI-Powered|AI-powered|AI-Generated|AI-generated|our AI (handles|understands)' \
   'AI wording while website generation is keyword-matched templates (audit rows 11, 26)'
 
+# Owner decision: the product is described as an instant template builder, never as AI.
+# No model is called anywhere in the codebase, so credits and generated sites are not
+# "AI" anything. The brand name "SiteLaunch AI" is excluded — renaming it is separate.
+fail_if_present app 'AI credits|AI Credits|AI-generated|AI generated|AI website|AI site|AI-built|AI builder|AI-powered|AI powered|powered by AI|our AI|with AI|AI writes|AI creates|AI writes' \
+  'AI-generation wording — no model is called; the product is a template builder (owner decision)'
+
 # --- audit 16: the lead search API caps at 20 results per page -------------
 fail_if_present app '50 results per search' \
   'the lead search API caps at 20 results per page (audit row 16)'
