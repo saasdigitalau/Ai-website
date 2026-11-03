@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [generatedSite, setGeneratedSite] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
 
   useEffect(() => {
@@ -22,7 +23,10 @@ export default function Home() {
         body: JSON.stringify({ description }),
       });
       const data = await res.json();
-      if (data.html) setGeneratedSite(data.html);
+      if (data.html) {
+        setSavedId(typeof data.savedId === "string" ? data.savedId : null);
+        setGeneratedSite(data.html);
+      }
     } catch {
       // fallback demo
       setGeneratedSite(`<div style="padding:2rem;text-align:center"><h2>Site generated for: ${description}</h2><p style="color:gray;margin-top:1rem">Something went wrong. Please try again with a different description.</p></div>`);
@@ -33,8 +37,14 @@ export default function Home() {
     return (
       <div className="h-screen flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
-          <button onClick={() => setGeneratedSite(null)} className="text-sm text-indigo-600 font-semibold hover:underline">← Back to SiteLaunch</button>
-          <span className="text-xs text-gray-400">Generated site preview</span>
+          <button onClick={() => { setGeneratedSite(null); setSavedId(null); }} className="text-sm text-indigo-600 font-semibold hover:underline">← Back to SiteLaunch</button>
+          {savedId ? (
+            <a href={`/dashboard/sites/${savedId}`} className="text-xs font-semibold text-emerald-600 hover:underline">
+              Saved to My Sites
+            </a>
+          ) : (
+            <span className="text-xs text-gray-400">Generated site preview</span>
+          )}
         </div>
         <iframe srcDoc={generatedSite} className="flex-1 w-full border-0" title="Generated Site" />
       </div>

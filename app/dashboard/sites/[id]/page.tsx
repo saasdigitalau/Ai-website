@@ -103,6 +103,24 @@ export default async function SiteDetailPage({
           <p className="mt-1 text-sm text-gray-500">Custom domain, branding, more</p>
         </div>
       </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-heading text-lg font-bold text-gray-900">Saved site</h2>
+          <span className="text-xs text-gray-400">Draft preview</span>
+        </div>
+        {website.html ? (
+          <iframe
+            srcDoc={website.html}
+            title={`${website.name} preview`}
+            className="w-full h-[600px] border-0 bg-white"
+          />
+        ) : (
+          <p className="px-6 py-12 text-sm text-gray-500 text-center">
+            This site has no saved page content.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
