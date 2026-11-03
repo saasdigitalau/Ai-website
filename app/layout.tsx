@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
@@ -23,6 +24,8 @@ export default function RootLayout({
       <html lang="en" className={`${inter.variable} ${jakarta.variable}`}>
         <body className="font-body">
           {children}
+          {/* One toast host for the whole app, including the pricing page. */}
+          <Toaster position="top-right" />
         </body>
       </html>
     </ClerkProvider>

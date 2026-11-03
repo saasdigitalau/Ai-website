@@ -1,7 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import DashboardNav from "@/components/dashboard-nav";
-import { Toaster } from "react-hot-toast";
 
 export default async function DashboardLayout({
   children,
@@ -43,7 +42,6 @@ export default async function DashboardLayout({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
-      <Toaster position="top-right" />
     </div>
   );
 }
