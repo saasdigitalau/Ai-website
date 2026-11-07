@@ -22,6 +22,71 @@ function asSentence(text: string): string {
   return /[.!?]$/.test(capitalised) ? capitalised : `${capitalised}.`;
 }
 
+// One `trades` template, three variants. Electricians, plumbers and builders want
+// the same shape of site — call-out strip, service cards, service area, licence
+// details, photos of past jobs — but different service names and hero line, so the
+// variant is picked from the description instead of duplicating the whole template.
+type TradeVariant = "electrical" | "plumbing" | "building";
+
+const TRADE_VARIANT_KEYWORDS: Record<TradeVariant, string[]> = {
+  electrical: ["electrician", "electrical", "sparky", "solar"],
+  plumbing: ["plumber", "plumbing", "blocked drain", "gas fit", "gasfitting", "hot water"],
+  building: ["builder", "building", "construction", "renovation", "extension", "carpenter", "concreting", "tiling", "roofing", "landscap", "painter", "painting", "handyman", "deck"],
+};
+
+function pickTradeVariant(description: string): TradeVariant {
+  const lower = (description || "").toLowerCase();
+  for (const variant of ["electrical", "plumbing", "building"] as TradeVariant[]) {
+    if (TRADE_VARIANT_KEYWORDS[variant].some((kw) => lower.includes(kw))) return variant;
+  }
+  // "tradesman"/"trade" match the template without naming a trade — building is
+  // the broadest wording, so it is the least wrong guess.
+  return "building";
+}
+
+const TRADE_VARIANTS: Record<TradeVariant, {
+  badge: string;
+  heroLine: string;
+  services: { title: string; desc: string }[];
+}> = {
+  electrical: {
+    badge: "Electrical",
+    heroLine: "Switchboards, lighting, fault finding and new wiring, quoted before we start.",
+    services: [
+      { title: "Switchboard upgrades", desc: "Older fuse boxes replaced with safety switches and modern circuit protection." },
+      { title: "Safety inspections", desc: "Wiring, power points and switchboards checked, with a written list of anything that needs fixing." },
+      { title: "New installations", desc: "Power points, circuits and lighting for new rooms, sheds, garages and fit-outs." },
+      { title: "Lighting design", desc: "Indoor and outdoor lighting planned around how you actually use the space." },
+      { title: "Fault finding", desc: "Tripping circuits and dead power points traced and repaired." },
+      { title: "Solar-ready wiring", desc: "Switchboard capacity and cabling prepared so panels can be added later." },
+    ],
+  },
+  plumbing: {
+    badge: "Plumbing & gas",
+    heroLine: "Blocked drains, hot water, leaks and gas fitting, quoted before we start.",
+    services: [
+      { title: "Blocked drains", desc: "Drains cleared and camera-checked so you know what caused the blockage." },
+      { title: "Hot water systems", desc: "Repairs and replacements for gas, electric and heat-pump units." },
+      { title: "Leaks and repairs", desc: "Leaking taps, toilets and pipes found and fixed before they cause damage." },
+      { title: "Gas fitting", desc: "Gas appliance installation, servicing and leak testing." },
+      { title: "Bathroom renovations", desc: "Rough-in and fit-off plumbing for bathroom and laundry renovations." },
+      { title: "New connections", desc: "Water, sewer and stormwater connections for new builds and extensions." },
+    ],
+  },
+  building: {
+    badge: "Building & renovations",
+    heroLine: "Renovations, extensions and new builds, quoted before we start.",
+    services: [
+      { title: "Renovations", desc: "Kitchens, bathrooms and whole-of-home renovations managed from demolition to handover." },
+      { title: "Extensions", desc: "Single and double-storey extensions tied into the existing structure." },
+      { title: "New builds", desc: "New homes built from slab to handover against an agreed scope of work." },
+      { title: "Repairs and maintenance", desc: "Structural repairs, patching and general maintenance jobs, big or small." },
+      { title: "Decks and pergolas", desc: "Timber and composite decks, pergolas and carports built to plan." },
+      { title: "Project management", desc: "Trades, approvals and timelines coordinated so you deal with one builder." },
+    ],
+  },
+};
+
 const BUSINESS_TEMPLATES: Record<string, any> = {
   restaurant: {
     icon: "🍽️",
@@ -299,6 +364,98 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       }
     })
   },
+  trades: {
+    icon: "🔧",
+    // Trade wording only, and deliberately no bare "services": the general entry
+    // below owns "services"/"agency"/"studio"/"shop", so this entry has to sit
+    // before it without stealing those businesses.
+    keywords: ["electrician", "electrical", "sparky", "plumber", "plumbing", "blocked drain", "gas fitting", "builder", "building", "construction", "renovation", "extensions", "carpenter", "concreting", "tiling", "roofing", "landscaper", "landscaping", "painter", "painting", "handyman", "trade", "tradesman"],
+    defaultName: "Your Trade Business",
+    // Hi-vis orange accent on dark slate. secondaryColor is the dark slate: it
+    // drives the dark hero and the availability / service-area panels, and
+    // generateHtml forces the contact section light when darkHero is set, so no
+    // heading ever lands dark-on-dark.
+    primaryColor: "#ea580c",
+    secondaryColor: "#0f172a",
+    fontFamily: "'Inter', sans-serif",
+    generateContent: (name: string, desc: string) => {
+      const variant = pickTradeVariant(desc);
+      const v = TRADE_VARIANTS[variant];
+      return {
+        tradeVariant: variant,
+        darkHero: true,
+        heroBadge: v.badge,
+        // The business name is the headline; the customer's own one-line
+        // description is the sub-line.
+        heroTitle: name,
+        heroSubtitle: desc ? asSentence(desc) : v.heroLine,
+        ctaPrimary: { label: "Get a free quote", href: "#contact" },
+        // No quote form: a form that posts nowhere is a fake. Phone and email only.
+        ctaSecondary: { label: "Call [Your phone number]", href: "tel:[Your phone number]" },
+        navLinks: [
+          { label: "What we do", href: "#services" },
+          { label: "Service area", href: "#service-area" },
+          { label: "Our work", href: "#work" }
+        ],
+        // Availability is a placeholder the customer fills in — never "24/7".
+        availability: { text: "Same-day call-outs", detail: "[Your hours]" },
+        aboutHeading: "Who you're calling",
+        aboutText: `${name}. ${desc ? asSentence(desc) : v.heroLine} Every job starts with a quote, so you know what is being done and what it costs before any work begins.`,
+        servicesHeading: "What We Do",
+        services: v.services.map((s) => ({ title: s.title, desc: s.desc, price: "" })),
+        serviceArea: {
+          eyebrow: "Service Area",
+          heading: "Service Area",
+          lead: "Servicing [Your suburb] and surrounds",
+          note: "Placeholder suburbs — replace these with the areas you actually cover.",
+          suburbs: ["[Suburb 1]", "[Suburb 2]", "[Suburb 3]", "[Suburb 4]"]
+        },
+        // Credentials are placeholders. Nothing here is invented: the customer
+        // types in their own licence, ABN and insurer.
+        credentials: {
+          heading: "Licensed, insured and accountable",
+          note: "Placeholder details — replace with your own licence number, ABN, insurer and years in business.",
+          items: [
+            { label: "Licence", value: "[Your licence number]" },
+            { label: "ABN", value: "[Your ABN]" },
+            { label: "Insured by", value: "[Your insurer]" },
+            { label: "In business", value: "[Years in business]" }
+          ]
+        },
+        // Photo tiles, not photos. No generated or stock imagery goes anywhere.
+        workGallery: {
+          heading: "Before & After",
+          note: "Add photos of your own work — these tiles are placeholders, not examples.",
+          items: [0, 1, 2].map(() => ({
+            label: "Add a photo of your work",
+            tag: "Before / After",
+            caption: "[Job description]"
+          }))
+        },
+        testimonials: [
+          {
+            name: "[Customer name]",
+            text: "Sample review — replace with a real customer quote.",
+            role: "[Customer role]",
+            stars: 0
+          },
+          {
+            name: "[Customer name]",
+            text: "Sample review — replace with a real customer quote.",
+            role: "[Customer role]",
+            stars: 0
+          }
+        ],
+        contactInfo: {
+          address: "[Your street address]",
+          phone: "[Your phone number]",
+          phoneLink: true,
+          email: "[Your email]",
+          hours: "[Your opening hours]"
+        }
+      };
+    }
+  },
   general: {
     icon: "💼",
     keywords: ["business", "professional", "services", "consulting", "agency", "studio", "shop"],
@@ -387,6 +544,10 @@ function initial(name: string): string {
 }
 
 function generateHtml(data: WebsiteData["metadata"], content: any, lang: string = "en"): string {
+  // A dark-hero template (trades) uses its secondary colour as a dark slate panel,
+  // so the contact section is forced onto a light surface — otherwise its
+  // text-gray-900 headings would land dark-on-dark.
+  const contactBg = content.darkHero ? "#f1f5f9" : data.secondaryColor;
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
@@ -421,14 +582,14 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
     </div>
   </nav>
 
-  <section class="relative min-h-[80vh] flex items-center" style="background: linear-gradient(135deg, ${data.primaryColor}15, ${data.secondaryColor}30)">
+  <section class="relative min-h-[80vh] flex items-center" style="${content.darkHero ? `background:${data.secondaryColor}` : `background: linear-gradient(135deg, ${data.primaryColor}15, ${data.secondaryColor}30)`}">
     <div class="max-w-6xl mx-auto px-6 py-20">
       <div class="max-w-3xl">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-6" style="background:${data.primaryColor}20;color:${data.primaryColor}">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-6" style="${content.darkHero ? `background:${data.primaryColor};color:${data.secondaryColor}` : `background:${data.primaryColor}20;color:${data.primaryColor}`}">
           <span>★</span> ${content.heroBadge || T("Open For Business", lang)}
         </div>
-        <h1 class="text-5xl md:text-7xl font-extrabold leading-[0.95] tracking-tight text-gray-900">${content.heroTitle}</h1>
-        <p class="mt-6 text-lg md:text-xl text-gray-600 max-w-xl leading-relaxed">${content.heroSubtitle}</p>
+        <h1 class="text-5xl md:text-7xl font-extrabold leading-[0.95] tracking-tight ${content.darkHero ? "text-white" : "text-gray-900"}">${content.heroTitle}</h1>
+        <p class="mt-6 text-lg md:text-xl ${content.darkHero ? "text-slate-300" : "text-gray-600"} max-w-xl leading-relaxed">${content.heroSubtitle}</p>
         <div class="mt-8 flex flex-wrap gap-3">
           <a href="${content.ctaPrimary?.href || "#contact"}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}">${content.ctaPrimary?.label || T("Get Started", lang)} <i class="fas fa-arrow-right text-xs"></i></a>
           <a href="${content.ctaSecondary?.href || "#services"}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 bg-white shadow-sm hover:shadow transition-all border border-gray-200">${content.ctaSecondary?.label || T("Our Services", lang)}</a>
@@ -436,6 +597,16 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       </div>
     </div>
   </section>
+
+  ${content.availability ? `
+  <section class="px-6 py-3 border-t border-b border-white/10" style="background:${data.secondaryColor}">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm font-bold">
+      <i class="fas fa-bolt" style="color:${data.primaryColor}"></i>
+      <span style="color:${data.primaryColor}">${content.availability.text}</span>
+      <span class="text-white">— ${content.availability.detail}</span>
+    </div>
+  </section>
+  ` : ""}
 
   <section id="about" class="py-20 px-6">
     <div class="max-w-4xl mx-auto text-center">
@@ -513,6 +684,67 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   </section>
   ` : ""}
 
+  ${content.serviceArea ? `
+  <section id="service-area" class="py-20 px-6" style="background:${data.secondaryColor}">
+    <div class="max-w-5xl mx-auto text-center">
+      <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor};color:${data.secondaryColor}">${content.serviceArea.eyebrow}</div>
+      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-white">${content.serviceArea.lead}</h2>
+      <p class="mt-4 text-sm text-slate-300 max-w-xl mx-auto">${content.serviceArea.note}</p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        ${content.serviceArea.suburbs.map((s: string) => `
+        <span class="px-4 py-2 rounded-full text-sm font-semibold text-white bg-white/10 border border-white/20">${s}</span>
+        `).join("")}
+      </div>
+    </div>
+  </section>
+  ` : ""}
+
+  ${content.credentials ? `
+  <section id="credentials" class="py-16 px-6 bg-white border-b border-gray-100">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Credentials</div>
+        <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900">${content.credentials.heading}</h2>
+        <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.credentials.note}</p>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${content.credentials.items.map((c: any) => `
+        <div class="rounded-2xl p-5 text-center bg-gray-50 border border-gray-200">
+          <div class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">${c.label}</div>
+          <div class="text-sm font-bold text-gray-900">${c.value}</div>
+        </div>
+        `).join("")}
+      </div>
+    </div>
+  </section>
+  ` : ""}
+
+  ${content.workGallery ? `
+  <section id="work" class="py-20 px-6 bg-gray-50">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-12">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Our Work</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.workGallery.heading}</h2>
+        <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.workGallery.note}</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        ${content.workGallery.items.map((w: any) => `
+        <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          <div class="h-44 flex flex-col items-center justify-center gap-2 border-b border-dashed border-gray-300" style="background:${data.secondaryColor}0d">
+            <i class="fas fa-camera text-xl" style="color:${data.primaryColor}"></i>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-center px-4" style="color:${data.primaryColor}">${w.label}</span>
+          </div>
+          <div class="p-6">
+            <div class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">${w.tag}</div>
+            <h3 class="text-lg font-bold text-gray-900">${w.caption}</h3>
+          </div>
+        </div>
+        `).join("")}
+      </div>
+    </div>
+  </section>
+  ` : ""}
+
   <section id="testimonials" class="py-20 px-6">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12">
@@ -534,7 +766,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
     </div>
   </section>
 
-  <section id="contact" class="py-20 px-6" style="background:${data.secondaryColor}">
+  <section id="contact" class="py-20 px-6" style="background:${contactBg}">
     <div class="max-w-4xl mx-auto">
       <div class="text-center mb-12">
         <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Contact", lang)}</div>
@@ -547,7 +779,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
         </div>
         <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
           <i class="fas fa-phone text-xl mb-3" style="color:${data.primaryColor}"></i>
-          <p class="text-sm text-gray-600">${content.contactInfo.phone}</p>
+          <p class="text-sm text-gray-600">${content.contactInfo.phoneLink ? `<a href="tel:${content.contactInfo.phone}" class="hover:underline">${content.contactInfo.phone}</a>` : content.contactInfo.phone}</p>
         </div>
         <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
           <i class="fas fa-clock text-xl mb-3" style="color:${data.primaryColor}"></i>
