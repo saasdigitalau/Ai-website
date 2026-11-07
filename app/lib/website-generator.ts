@@ -369,7 +369,7 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     // Trade wording only, and deliberately no bare "services": the general entry
     // below owns "services"/"agency"/"studio"/"shop", so this entry has to sit
     // before it without stealing those businesses.
-    keywords: ["electrician", "electrical", "sparky", "plumber", "plumbing", "blocked drain", "gas fitting", "builder", "building", "construction", "renovation", "extensions", "carpenter", "concreting", "tiling", "roofing", "landscaper", "landscaping", "painter", "painting", "handyman", "trade", "tradesman"],
+    keywords: ["electrician", "electrical", "sparky", "plumber", "plumbing", "blocked drain", "gas fitting", "builder", "building", "construction", "renovation", "extensions", "carpenter", "concreting", "tiling", "tiler", "roofing", "roofer", "landscaper", "landscaping", "painter", "painting", "handyman", "trade", "tradesman"],
     defaultName: "Your Trade Business",
     // Hi-vis orange accent on dark slate. secondaryColor is the dark slate: it
     // drives the dark hero and the availability / service-area panels, and
