@@ -23,6 +23,9 @@ import {
 //    User.subscriptionStatus are written only by the signature-verified webhook
 //    in app/api/webhook/razorpay/route.ts, from subscription.activated,
 //    subscription.charged and subscription.cancelled.
+//  * Site credits are granted in the same place and the same update as the plan
+//    (SUBSCRIPTION_CREDITS below): one paid month sets the balance to that
+//    tier's allowance, keyed on the paid period so a Razorpay retry grants once.
 //  * No keys → every caller gets a typed "not connected" error; nothing here
 //    throws at module load.
 // ---------------------------------------------------------------------------
@@ -52,6 +55,20 @@ export const SUBSCRIPTION_TIER_KEYS = Object.keys(SUBSCRIPTION_TIERS) as Subscri
 export function isSubscriptionTier(value: unknown): value is SubscriptionTier {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(SUBSCRIPTION_TIERS, value);
 }
+
+/**
+ * Site credits granted per paid month, per tier (owner decision, Nov 3).
+ *
+ * A paid month *sets* the balance to this allowance instead of adding to it, so
+ * a Razorpay retry cannot stack and a downgrade cannot leave a higher balance
+ * behind. Every user-facing label calls these "site credits"; the column name
+ * (User.aiCredits) is legacy and is deliberately not renamed.
+ */
+export const SUBSCRIPTION_CREDITS: Record<SubscriptionTier, number> = {
+  starter: 100,
+  pro: 200,
+  business: 500,
+};
 
 /** Public catalogue — safe to return to the browser (no secrets, no plan ids). */
 export const SUBSCRIPTION_TIER_LIST = SUBSCRIPTION_TIER_KEYS.map((tier) => ({
@@ -224,6 +241,10 @@ export type SubscriptionEventResult = {
   userId?: string;
   tier?: SubscriptionTier | "free";
   status?: string;
+  /** True only when this delivery wrote the tier's site credits to the account. */
+  creditsGranted?: boolean;
+  /** The account's site-credit balance after this delivery. */
+  siteCredits?: number;
 };
 
 /**
@@ -232,6 +253,13 @@ export type SubscriptionEventResult = {
  * The user is found by the subscription id recorded at checkout, falling back
  * to the ids carried in the subscription's notes. The tier comes from the
  * plan id, falling back to the tier in the notes only when the plan is unknown.
+ *
+ * A paid month (subscription.activated / subscription.charged on an active
+ * subscription) also sets the account's site credits to that tier's allowance,
+ * in the same update as the plan. The grant is keyed on the paid period
+ * (subscription.current_end) rather than on the delivery, so Razorpay retries
+ * and duplicate events for the same month grant once. Nothing here grants
+ * credits on a cancelled subscription or on an unknown user/plan.
  */
 export async function applySubscriptionEvent(
   event: RazorpayWebhookEvent
@@ -242,6 +270,15 @@ export async function applySubscriptionEvent(
   const tierFromPlan = await tierForPlanId(entity.plan_id);
   const noteTier = isSubscriptionTier(entity.notes?.tier) ? entity.notes.tier : null;
   const tier = tierFromPlan ?? noteTier;
+
+  // An unrecognised plan id is worth a log line: the tier then comes from the
+  // notes our own checkout wrote, never from anything the caller sent.
+  if (!tierFromPlan && tier) {
+    console.warn(
+      `Razorpay webhook: plan ${entity.plan_id ?? "(none)"} is not a known plan id; ` +
+        `using the tier recorded at checkout (${tier})`
+    );
+  }
 
   let user = await prisma.user.findUnique({
     where: { razorpaySubscriptionId: entity.id },
@@ -285,14 +322,47 @@ export async function applySubscriptionEvent(
 
   if (!tier) return { handled: false, reason: "unknown plan" };
 
+  // --- site credits for this paid month ------------------------------------
+  // The paid period is identified by the subscription's current_end, which
+  // Razorpay advances only when a new month is actually paid. A retried or
+  // duplicated delivery for the same month therefore lands on the same key and
+  // is skipped; a new month is a new key and grants the allowance again.
+  const periodKey = endsAt ? endsAt.getTime() : null;
+  if (periodKey === null) {
+    console.warn(
+      `Razorpay webhook: subscription ${entity.id} carries no current_end; ` +
+        `crediting without a period key (the balance is set, never added, so a retry cannot stack)`
+    );
+  }
+  const periodAlreadyCredited =
+    periodKey !== null &&
+    user.razorpaySubscriptionId === entity.id &&
+    user.subscriptionEndsAt !== null &&
+    user.subscriptionEndsAt.getTime() === periodKey;
+
+  const allowance = SUBSCRIPTION_CREDITS[tier];
+
+  // A tier change re-sets the balance even inside an already-credited period, so
+  // the credits always match the plan the customer is on.
+  const grantCredits = !periodAlreadyCredited || user.plan !== tier;
+
   const unchanged =
     user.plan === tier &&
     user.subscriptionStatus === "active" &&
     user.razorpaySubscriptionId === entity.id;
 
-  if (unchanged) {
-    // Idempotent replay: a duplicate "charged" changes nothing.
-    return { handled: true, userId: user.id, tier, status: "active" };
+  if (unchanged && !grantCredits) {
+    // Duplicate delivery for a month that has already been credited: write
+    // nothing, and still answer 200 so Razorpay stops retrying.
+    return {
+      handled: true,
+      userId: user.id,
+      tier,
+      status: "active",
+      creditsGranted: false,
+      siteCredits: user.aiCredits,
+      reason: "paid period already credited",
+    };
   }
 
   await prisma.user.update({
@@ -302,8 +372,17 @@ export async function applySubscriptionEvent(
       plan: tier,
       subscriptionStatus: "active",
       ...(endsAt ? { subscriptionEndsAt: endsAt } : {}),
+      // Set, never add: one paid month is one allowance.
+      ...(grantCredits ? { aiCredits: allowance } : {}),
     },
   });
 
-  return { handled: true, userId: user.id, tier, status: "active" };
+  return {
+    handled: true,
+    userId: user.id,
+    tier,
+    status: "active",
+    creditsGranted: grantCredits,
+    siteCredits: grantCredits ? allowance : user.aiCredits,
+  };
 }
