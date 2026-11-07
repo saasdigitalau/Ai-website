@@ -21,7 +21,10 @@ import { applySubscriptionEvent, isSubscriptionEvent } from "@/lib/razorpay-subs
 //    equals the payment's order_id, require the amount and AUD currency to
 //    match, and flip it to paid.
 //  * subscription.activated / subscription.charged / subscription.cancelled →
-//    update the owning user's plan and subscriptionStatus.
+//    update the owning user's plan and subscriptionStatus. A paid month
+//    (activated / charged) also sets the account's site credits to that tier's
+//    allowance, once per paid period, in the same update — this webhook is the
+//    only place credits are granted, and a cancelled subscription grants none.
 //  * anything else verified → acknowledged with handled:false, nothing written.
 //
 // No secret configured → 503 not_connected (an explicit state, not a crash).
