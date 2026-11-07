@@ -11,6 +11,17 @@ export interface WebsiteData {
   };
 }
 
+// Descriptions are typed by hand and usually arrive as a fragment ("a local real
+// estate agent in Port Kennedy helping people buy and sell homes"). Dropped into
+// a paragraph as-is it ran on from the business name with no punctuation, so it
+// is normalised to a sentence: capital first letter, trailing full stop.
+function asSentence(text: string): string {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return "";
+  const capitalised = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(capitalised) ? capitalised : `${capitalised}.`;
+}
+
 const BUSINESS_TEMPLATES: Record<string, any> = {
   restaurant: {
     icon: "🍽️",
@@ -22,7 +33,7 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     generateContent: (name: string, desc: string) => ({
       heroTitle: `Exquisite Dining at ${name}`,
       heroSubtitle: `Taste the finest culinary creations made with fresh, organic ingredients.`,
-      aboutText: `Welcome to ${name}. ${desc || "We are a passion-driven culinary destination dedicated to bringing you an exceptional dining experience."}`,
+      aboutText: `Welcome to ${name}. ${desc ? asSentence(desc) : "We are a passion-driven culinary destination dedicated to bringing you an exceptional dining experience."}`,
       services: [
         { title: "Fine Dining", desc: "Multi-course menu paired with exceptional wines.", price: "[Your price]" },
         { title: "Private Events", desc: "Celebrate special occasions with custom catering.", price: "[Your price]" },
@@ -60,7 +71,9 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     generateContent: (name: string, desc: string) => ({
       heroTitle: `Unleash Your Potential at ${name}`,
       heroSubtitle: `No excuses. Just results. Join the premier fitness community.`,
-      aboutText: `At ${name}, ${desc || "we believe fitness is a lifestyle. Our elite coaches and motivating classes help you shatter your limits."}`,
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `At ${name}, we believe fitness is a lifestyle. Our elite coaches and motivating classes help you shatter your limits.`,
       services: [
         { title: "Personal Training", desc: "One-on-one tailored fitness programming.", price: "[Your price]" },
         { title: "Group Classes", desc: "HIIT, CrossFit, and strength conditioning.", price: "[Your price]" },
@@ -98,7 +111,9 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     generateContent: (name: string, desc: string) => ({
       heroTitle: `Discover Your Glow at ${name}`,
       heroSubtitle: `Where beauty meets relaxation. Premium care for every style.`,
-      aboutText: `${name} ${desc || "is a luxury beauty destination offering premium hair, nail, and skincare services. Our expert stylists bring out your best."}`,
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `${name} is a luxury beauty destination offering premium hair, nail, and skincare services. Our expert stylists bring out your best.`,
       services: [
         { title: "Signature Hair", desc: "Cut, color, and styling by master stylists.", price: "[Your price]" },
         { title: "Luxury Facial", desc: "Rejuvenating treatments for radiant skin.", price: "[Your price]" },
@@ -136,7 +151,9 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     generateContent: (name: string, desc: string) => ({
       heroTitle: `Your Brightest Smile Starts at ${name}`,
       heroSubtitle: `Gentle, modern dentistry. We make every visit comfortable.`,
-      aboutText: `${name} ${desc || "provides comprehensive dental care with cutting-edge technology. Your comfort and smile are our top priorities."}`,
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `${name} provides comprehensive dental care with cutting-edge technology. Your comfort and smile are our top priorities.`,
       services: [
         { title: "General Dentistry", desc: "Cleanings, exams, and preventive care.", price: "[Your price]" },
         { title: "Cosmetic", desc: "Whitening, veneers, and smile makeovers.", price: "[Your price]" },
@@ -174,7 +191,9 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     generateContent: (name: string, desc: string) => ({
       heroTitle: `Find Your Inner Peace at ${name}`,
       heroSubtitle: `A sanctuary for body, mind, and soul. All levels welcome.`,
-      aboutText: `${name} ${desc || "is a welcoming space where you can step away from the noise of daily life and reconnect with yourself through mindful movement and breath."}`,
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `${name} is a welcoming space where you can step away from the noise of daily life and reconnect with yourself through mindful movement and breath.`,
       services: [
         { title: "Vinyasa Flow", desc: "Dynamic sequences linking breath with movement.", price: "[Your price]" },
         { title: "Sound Healing", desc: "Restorative sessions with singing bowls.", price: "[Your price]" },
@@ -202,6 +221,84 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       }
     })
   },
+  realestate: {
+    icon: "🏡",
+    // Real-estate wording only. The bare word "agent" is deliberately absent —
+    // it would swallow travel agents and insurance brokers.
+    keywords: ["real estate", "realtor", "realty", "estate agent", "property", "properties", "listing", "listings", "appraisal", "homes for sale", "house and land", "buyer's agent", "mortgage broker"],
+    defaultName: "Your Agency Name",
+    primaryColor: "#1e3a5f",
+    secondaryColor: "#f7f4ef",
+    fontFamily: "'Inter', sans-serif",
+    generateContent: (name: string, desc: string) => ({
+      // Serif headings over the sans body set above.
+      headingFontFamily: "'Playfair Display', serif",
+      heroBadge: "Property sales & appraisals",
+      heroTitle: name,
+      heroSubtitle: desc ? asSentence(desc) : "Local property sales, buyer representation and free appraisals, from first meeting to settlement.",
+      ctaPrimary: { label: "Book a free appraisal", href: "#contact" },
+      ctaSecondary: { label: "View listings", href: "#listings" },
+      navLinks: [
+        { label: "Listings", href: "#listings" },
+        { label: "How it works", href: "#process" }
+      ],
+      aboutHeading: "About your agent",
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `${name} helps people buy and sell property locally, from the first appraisal through to settlement.`,
+      servicesHeading: "What I Do",
+      services: [
+        { title: "Selling your home", desc: "Appraisal, marketing campaign and negotiation, handled from listing through to settlement.", price: "" },
+        { title: "Buying with confidence", desc: "Shortlisting, inspections and offers, with the paperwork looked after for you.", price: "" },
+        { title: "Free property appraisal", desc: "An honest opinion of what your property is worth today, with no obligation to list.", price: "" }
+      ],
+      // Every factual field on a listing card is a visible placeholder — no
+      // addresses, suburbs, prices or dates are invented for the customer.
+      listings: {
+        heading: "Current Listings",
+        note: "Placeholder listings — replace each field with your own property details.",
+        items: [0, 1, 2].map(() => ({
+          suburb: "[Suburb]",
+          type: "[Property type]",
+          spec: "[X] bed · [X] bath · [X] car",
+          price: "[Sale price]",
+          status: "[Sold date]"
+        }))
+      },
+      processSteps: {
+        heading: "How Selling Works",
+        note: "The same three steps for every property. No two campaigns are identical.",
+        steps: [
+          { title: "Appraisal", desc: "We walk through the property, agree a realistic price guide and set the plan for the campaign." },
+          { title: "Campaign", desc: "Photography, listing copy and inspections are arranged, then offers are presented and negotiated." },
+          { title: "Sold", desc: "Contracts are exchanged and the sale is managed through to settlement." }
+        ]
+      },
+      testimonials: [
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
+      ],
+      contactInfo: {
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[Your email]",
+        hours: "[Your opening hours]",
+        // WA agents must display a licence/registration number, so this is a
+        // placeholder field rather than a made-up credential.
+        licence: "[Your licence number]"
+      }
+    })
+  },
   general: {
     icon: "💼",
     keywords: ["business", "professional", "services", "consulting", "agency", "studio", "shop"],
@@ -212,7 +309,9 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
     generateContent: (name: string, desc: string) => ({
       heroTitle: `Welcome to ${name}`,
       heroSubtitle: `Professional services tailored to your needs.`,
-      aboutText: `${name} ${desc || "delivers top-quality professional services. We're committed to excellence and client satisfaction in everything we do."}`,
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `${name} delivers top-quality professional services. We're committed to excellence and client satisfaction in everything we do.`,
       services: [
         { title: "Consultation", desc: "Expert advice tailored to your goals.", price: "[Your price]" },
         { title: "Full Service", desc: "End-to-end management of your project.", price: "[Your price]" },
@@ -298,8 +397,10 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=${data.fontFamily.replace(/[' ]/g, "")}&display=swap');
+    ${content.headingFontFamily ? `@import url('https://fonts.googleapis.com/css2?family=${content.headingFontFamily.replace(/['"]/g, "").split(",")[0].trim().replace(/ /g, "+")}&display=swap');` : ""}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: ${data.fontFamily}, sans-serif; }
+    ${content.headingFontFamily ? `h1, h2, h3 { font-family: ${content.headingFontFamily}; }` : ""}
     .gradient-bg { background: linear-gradient(135deg, ${data.primaryColor}, ${data.secondaryColor}); }
   </style>
 </head>
@@ -313,6 +414,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
         <a href="#about" class="hover:text-gray-900">${T("About", lang)}</a>
         <a href="#services" class="hover:text-gray-900">${T("Services", lang)}</a>
+        ${(content.navLinks || []).map((l: any) => `<a href="${l.href}" class="hover:text-gray-900">${l.label}</a>`).join("")}
         <a href="#testimonials" class="hover:text-gray-900">${T("Testimonials", lang)}</a>
         <a href="#contact" class="hover:text-gray-900">${T("Contact", lang)}</a>
       </div>
@@ -323,13 +425,13 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
     <div class="max-w-6xl mx-auto px-6 py-20">
       <div class="max-w-3xl">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-6" style="background:${data.primaryColor}20;color:${data.primaryColor}">
-          <span>★</span> ${T("Open For Business", lang)}
+          <span>★</span> ${content.heroBadge || T("Open For Business", lang)}
         </div>
         <h1 class="text-5xl md:text-7xl font-extrabold leading-[0.95] tracking-tight text-gray-900">${content.heroTitle}</h1>
         <p class="mt-6 text-lg md:text-xl text-gray-600 max-w-xl leading-relaxed">${content.heroSubtitle}</p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <a href="#contact" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}">${T("Get Started", lang)} <i class="fas fa-arrow-right text-xs"></i></a>
-          <a href="#services" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 bg-white shadow-sm hover:shadow transition-all border border-gray-200">${T("Our Services", lang)}</a>
+          <a href="${content.ctaPrimary?.href || "#contact"}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}">${content.ctaPrimary?.label || T("Get Started", lang)} <i class="fas fa-arrow-right text-xs"></i></a>
+          <a href="${content.ctaSecondary?.href || "#services"}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 bg-white shadow-sm hover:shadow transition-all border border-gray-200">${content.ctaSecondary?.label || T("Our Services", lang)}</a>
         </div>
       </div>
     </div>
@@ -338,7 +440,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   <section id="about" class="py-20 px-6">
     <div class="max-w-4xl mx-auto text-center">
       <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("About", lang)}</div>
-      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("Our Story", lang)}</h2>
+      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.aboutHeading || T("Our Story", lang)}</h2>
       <p class="mt-6 text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">${content.aboutText}</p>
     </div>
   </section>
@@ -347,7 +449,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12">
         <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Services", lang)}</div>
-        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("What We Offer", lang)}</h2>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.servicesHeading || T("What We Offer", lang)}</h2>
       </div>
       <div class="grid md:grid-cols-3 gap-6">
         ${content.services.map((s: any) => `
@@ -355,12 +457,61 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
           <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold mb-4" style="background:${data.primaryColor}">${s.title[0]}</div>
           <h3 class="text-lg font-bold text-gray-900">${s.title}</h3>
           <p class="mt-2 text-sm text-gray-500">${s.desc}</p>
-          <div class="mt-4 text-xs font-bold" style="color:${data.primaryColor}">${s.price}</div>
+          ${s.price ? `<div class="mt-4 text-xs font-bold" style="color:${data.primaryColor}">${s.price}</div>` : ""}
         </div>
         `).join("")}
       </div>
     </div>
   </section>
+
+  ${content.listings ? `
+  <section id="listings" class="py-20 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-12">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Listings</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.listings.heading}</h2>
+        <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.listings.note}</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        ${content.listings.items.map((p: any) => `
+        <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all">
+          <div class="h-36 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-white/70" style="background:${data.primaryColor}">Photo placeholder</div>
+          <div class="p-6">
+            <div class="text-[10px] font-bold uppercase tracking-widest mb-2" style="color:${data.primaryColor}">${p.type}</div>
+            <h3 class="text-lg font-bold text-gray-900">${p.suburb}</h3>
+            <p class="mt-2 text-sm text-gray-500">${p.spec}</p>
+            <div class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <span class="text-sm font-bold text-gray-900">${p.price}</span>
+              <span class="text-[10px] font-bold uppercase tracking-widest text-gray-400">${p.status}</span>
+            </div>
+          </div>
+        </div>
+        `).join("")}
+      </div>
+    </div>
+  </section>
+  ` : ""}
+
+  ${content.processSteps ? `
+  <section id="process" class="py-20 px-6 bg-gray-50">
+    <div class="max-w-5xl mx-auto">
+      <div class="text-center mb-12">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Process</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.processSteps.heading}</h2>
+        <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.processSteps.note}</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        ${content.processSteps.steps.map((s: any, i: number) => `
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold mb-4" style="background:${data.primaryColor}">${i + 1}</div>
+          <h3 class="text-lg font-bold text-gray-900">${s.title}</h3>
+          <p class="mt-2 text-sm text-gray-500">${s.desc}</p>
+        </div>
+        `).join("")}
+      </div>
+    </div>
+  </section>
+  ` : ""}
 
   <section id="testimonials" class="py-20 px-6">
     <div class="max-w-6xl mx-auto">
@@ -389,7 +540,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
         <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Contact", lang)}</div>
         <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${T("Get In Touch", lang)}</h2>
       </div>
-      <div class="grid md:grid-cols-3 gap-6">
+      <div class="grid ${content.contactInfo.licence ? "md:grid-cols-4" : "md:grid-cols-3"} gap-6">
         <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
           <i class="fas fa-map-marker-alt text-xl mb-3" style="color:${data.primaryColor}"></i>
           <p class="text-sm text-gray-600">${content.contactInfo.address}</p>
@@ -402,6 +553,12 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
           <i class="fas fa-clock text-xl mb-3" style="color:${data.primaryColor}"></i>
           <p class="text-sm text-gray-600">${content.contactInfo.hours}</p>
         </div>
+        ${content.contactInfo.licence ? `
+        <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
+          <i class="fas fa-id-card text-xl mb-3" style="color:${data.primaryColor}"></i>
+          <p class="text-sm text-gray-600">${content.contactInfo.licence}</p>
+        </div>
+        ` : ""}
       </div>
       <div class="mt-6 text-center">
         ${/^\[/.test(content.contactInfo.email)
