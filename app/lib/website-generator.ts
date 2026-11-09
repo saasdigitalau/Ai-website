@@ -278,6 +278,131 @@ const PORTFOLIO_VARIANTS: Record<PortfolioVariant, {
   },
 };
 
+// One `health` template, two variants. An allied health practice and a veterinary
+// clinic want the same appointment-led page shape — appointment types, the team,
+// what to expect, fees and rebates, location and hours — but different appointment
+// names, fee wording and after-hours handling, so the variant is picked from the
+// description instead of duplicating the whole template.
+type HealthVariant = "allied" | "vet";
+
+// Named professions and multi-word clinic wording only. Bare "health", "clinic",
+// "care", "therapy", "vet", "medical", "doctor" and "services" are deliberately
+// absent: they would swallow a medical centre, a childcare centre and every generic
+// "services" business, which must keep falling through to their own template.
+const HEALTH_VARIANT_KEYWORDS: Record<HealthVariant, string[]> = {
+  allied: ["physiotherapist", "physiotherapy", "physio", "chiropractor", "chiropractic", "osteopath", "podiatrist", "podiatry", "myotherapist", "remedial massage", "occupational therapist", "speech pathologist", "psychologist", "dietitian", "allied health"],
+  vet: ["veterinary clinic", "vet clinic", "veterinarian", "animal hospital", "vet hospital", "veterinary surgeon", "veterinary practice", "vet practice"],
+};
+
+function pickHealthVariant(description: string): HealthVariant {
+  const lower = (description || "").toLowerCase();
+  for (const variant of ["allied", "vet"] as HealthVariant[]) {
+    if (HEALTH_VARIANT_KEYWORDS[variant].some((kw) => lower.includes(kw))) return variant;
+  }
+  // Matched the template without naming a profession — allied health is the broader
+  // reading of "allied health & veterinary", so allied is the least wrong guess.
+  return "allied";
+}
+
+const HEALTH_VARIANTS: Record<HealthVariant, {
+  badge: string;
+  heroLine: string;
+  appointmentHeading: string;
+  appointmentNote: string;
+  appointments: { title: string; desc: string }[];
+  teamEyebrow: string;
+  teamHeading: string;
+  teamNote: string;
+  teamIcon: string;
+  stepsNote: string;
+  steps: { title: string; desc: string }[];
+  fees: { eyebrow: string; heading: string; text: string; placeholder: string; extra: string; note: string };
+  office: { eyebrow: string; heading: string; lead: string; note: string };
+  afterHours?: string;
+}> = {
+  allied: {
+    badge: "Allied health",
+    heroLine: "Assessment, treatment and ongoing care, by appointment in [Suburb] and surrounds.",
+    appointmentHeading: "Appointment types",
+    appointmentNote: "Every appointment is booked in advance. Tell us what you need help with when you book, so the right appointment type and length are set.",
+    appointments: [
+      { title: "Initial consultation", desc: "A first appointment to hear what brought you in, take a history and assess what is going on, with the findings explained to you." },
+      { title: "Standard follow-up", desc: "A shorter appointment to continue treatment and review how things have gone since your last visit." },
+      { title: "Extended consultation", desc: "A longer appointment for more than one issue, or where there is more to work through." },
+      { title: "Care plan review", desc: "A scheduled review of your written care plan and your goals, with the plan updated as things change." },
+      { title: "Telehealth appointment", desc: "An appointment by video where coming in is not practical, confirmed as an option when you book." },
+      { title: "Referral appointment", desc: "An appointment booked on a referral from your GP or another practitioner, with the referral noted when you book." },
+    ],
+    teamEyebrow: "Our team",
+    teamHeading: "Your practitioners",
+    teamNote: "Placeholder bios — replace with your own practitioners' names, qualifications, special interests and the days they are available. Registration details are the practice's to supply.",
+    teamIcon: "fa-user-md",
+    stepsNote: "Three steps, the same for every appointment.",
+    steps: [
+      { title: "Book an appointment", desc: "Book online or by phone, and say what you would like help with so the right appointment type and length are set." },
+      { title: "Your first appointment", desc: "Your practitioner takes a history, assesses what is going on and talks through the options with you. Referral and paperwork requirements are set out when you book: [Your referral requirements]." },
+      { title: "Ongoing plan", desc: "You leave with a written plan setting out what was found, what happens next and when to book again." },
+    ],
+    // Fees and rebates are the honesty-critical block: no fee, no gap and no rebate
+    // amount is knowable here, so every figure is the practice's own placeholder and
+    // any rebate is described as conditional on the provider and the client's cover.
+    fees: {
+      eyebrow: "Fees and rebates",
+      heading: "Fees are confirmed when you book",
+      text: "The fee for each appointment type is confirmed when you book, and it is set out on our fee schedule. Any rebate depends on the provider or fund involved — a health fund, a government scheme or a compensable claim — and on your level of cover, so it differs from one client to the next. Ask before you book if you need to know what your cover provides.",
+      placeholder: "[Your fee schedule]",
+      extra: "[Your rebate information]",
+      note: "No fees and no rebate amounts are shown on this page. Replace this with your own fee schedule and your own rebate information, including the funds and providers you are recognised by.",
+    },
+    office: {
+      eyebrow: "Location and hours",
+      heading: "Where to find us",
+      lead: "At [Suburb], with clients travelling from [Suburb 2] and surrounds",
+      note: "Placeholder details — replace with your own clinic address, the suburbs you serve and your opening hours.",
+    },
+  },
+  vet: {
+    badge: "Veterinary clinic",
+    heroLine: "Appointments for check-ups, vaccinations and ongoing care, at [Suburb].",
+    appointmentHeading: "Appointment types",
+    appointmentNote: "Every appointment is booked in advance. Tell us what your animal needs when you book, so the right appointment type is set.",
+    appointments: [
+      { title: "General check-up", desc: "A routine examination, with what was found, what to watch for and what happens next explained at the visit." },
+      { title: "Vaccination appointment", desc: "A scheduled vaccination appointment, with the due dates and the records confirmed at the visit." },
+      { title: "New puppy or kitten visit", desc: "A first appointment for a new puppy or kitten, covering the checks and the questions you have about care at home." },
+      { title: "Dental appointment", desc: "A dental check, with any scale and polish booked as a separate appointment and confirmed with you beforehand." },
+      { title: "Senior animal check", desc: "A check-up for older animals, looking at mobility, weight and comfort, with the findings talked through with you." },
+      { title: "Post-operative recheck", desc: "A follow-up appointment after surgery or a procedure, to check healing and answer your questions." },
+    ],
+    teamEyebrow: "Our team",
+    teamHeading: "Our vets and nurses",
+    teamNote: "Placeholder bios — replace with your own team's names, qualifications, special interests and the days they are available. Registration details are the clinic's to supply.",
+    teamIcon: "fa-paw",
+    stepsNote: "Three steps, the same for every appointment.",
+    steps: [
+      { title: "Book an appointment", desc: "Book online or by phone, and say what kind of appointment your animal needs and how they travel." },
+      { title: "Your first visit", desc: "Bring [What to bring] — records from a previous clinic, current medication and vaccination history — and the vet goes through it with you." },
+      { title: "Ongoing care", desc: "Any treatment is explained to you, and the cost of it is confirmed with you before treatment begins." },
+    ],
+    fees: {
+      eyebrow: "Fees and rebates",
+      heading: "Costs are confirmed before treatment begins",
+      text: "The cost of a consultation, and of any treatment that follows it, is confirmed with you before treatment begins. If your animal is insured, any rebate depends on your insurer and your level of cover — it is paid by the insurer, and it differs from one policy to the next. Ask at booking if you need to know what your cover includes.",
+      placeholder: "[Your fee schedule]",
+      extra: "[Your rebate information]",
+      note: "No costs and no rebate amounts are shown on this page. Replace this with your own fee schedule and your own rebate information, including the insurers you work with.",
+    },
+    office: {
+      eyebrow: "Location and hours",
+      heading: "Where to find us",
+      lead: "At [Suburb], with clients travelling from [Suburb 2] and surrounds",
+      note: "Placeholder details — replace with your own clinic address, opening hours and after-hours arrangement.",
+    },
+    // No "24/7" and no emergency-service claim: the clinic supplies its own wording.
+    afterHours: "[Your after-hours arrangement]",
+  },
+};
+
 const BUSINESS_TEMPLATES: Record<string, any> = {
   restaurant: {
     icon: "🍽️",
@@ -396,6 +521,104 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
         hours: "[Your opening hours]"
       }
     })
+  },
+  health: {
+    icon: "🩺",
+    // Named professions and multi-word clinic wording only — no bare "health",
+    // "clinic", "care", "therapy", "vet", "medical", "doctor" or "services". This
+    // entry sits BEFORE `dentist` on purpose: the dentist entry owns the bare keyword
+    // "clinic", so without that "a veterinary clinic in Joondalup" would route to
+    // dentistry. It carries no dentist wording, so "a dentist in Perth" still lands
+    // on `dentist`.
+    keywords: [...HEALTH_VARIANT_KEYWORDS.allied, ...HEALTH_VARIANT_KEYWORDS.vet],
+    defaultName: "Your Clinic",
+    // Deep-green accent on a near-black green. secondaryColor drives the dark hero and
+    // the availability / location panels, so darkHero is set: generateHtml then paints
+    // the hero dark with white headings and forces the contact section light.
+    primaryColor: "#059669",
+    secondaryColor: "#0b2b26",
+    fontFamily: "'Inter', sans-serif",
+    generateContent: (name: string, desc: string) => {
+      const variant = pickHealthVariant(desc);
+      const v = HEALTH_VARIANTS[variant];
+      return {
+        healthVariant: variant,
+        darkHero: true,
+        // The clinic name is the headline; the customer's own description is the
+        // sub-line. No invented tagline and no claim about outcomes.
+        heroBadge: v.badge,
+        heroTitle: name,
+        heroSubtitle: desc ? asSentence(desc) : v.heroLine,
+        ctaPrimary: { label: "Book an appointment", href: "#contact" },
+        // No booking form: a form that posts nowhere is a fake. Phone only.
+        ctaSecondary: { label: "Call [Your phone number]", href: "tel:[Your phone number]" },
+        navLinks: [
+          { label: "Our team", href: "#practitioners" },
+          { label: "What to expect", href: "#process" },
+          { label: "Fees", href: "#fees" },
+          { label: v.office.eyebrow, href: "#office" }
+        ],
+        // An appointment-led page is appointment types, the team, what to expect, fees
+        // and rebates, location and contact — not an "about us" essay plus review cards,
+        // so the two standard sections are switched off for this template only.
+        hideAbout: true,
+        hideTestimonials: true,
+        // Vet only: the clinic's own after-hours arrangement, never "24/7" and never an
+        // emergency-service claim.
+        availability: v.afterHours ? { text: "After hours", detail: v.afterHours } : undefined,
+        servicesEyebrow: "Appointment types",
+        servicesHeading: v.appointmentHeading,
+        servicesNavLabel: "Appointments",
+        servicesNote: v.appointmentNote,
+        // Each card is something a patient or client books, not a marketing feature.
+        // No price on a card: fees are confirmed at booking (see the fees block).
+        services: v.appointments.map((a) => ({ title: a.title, desc: a.desc, price: "" })),
+        // Practitioner bios are placeholders only: no invented names, qualifications,
+        // registrations, years in practice or photos.
+        practitioners: {
+          eyebrow: v.teamEyebrow,
+          heading: v.teamHeading,
+          note: v.teamNote,
+          icon: v.teamIcon,
+          items: [1, 2, 3].map(() => ({
+            name: "[Practitioner name]",
+            details: [
+              { label: "Qualification", value: "[Qualification]" },
+              { label: "Special interest", value: "[Special interest]" },
+              { label: "Days available", value: "[Days available]" }
+            ]
+          }))
+        },
+        processSteps: {
+          heading: "What to expect",
+          note: v.stepsNote,
+          steps: v.steps
+        },
+        // Fees and rebates: no fee, no gap and no rebate amount is stated anywhere. Both
+        // figures are the clinic's own placeholders and every rebate is conditional on
+        // the provider and the client's level of cover.
+        fees: v.fees,
+        // Clinic location and hours. Hours are the clinic's own, never "24/7".
+        office: {
+          eyebrow: v.office.eyebrow,
+          heading: v.office.heading,
+          lead: v.office.lead,
+          address: "[Your street address], [Suburb]",
+          hours: "[Your opening hours]",
+          note: v.office.note,
+          suburbs: ["[Suburb 1]", "[Suburb 2]", "[Suburb 3]", "[Suburb 4]"]
+        },
+        contactInfo: {
+          address: "[Your street address]",
+          phone: "[Your phone number]",
+          phoneLink: true,
+          email: "[Your email]",
+          hours: "[Your opening hours]",
+          // One short line so nobody mistakes a generated page for clinical advice.
+          note: "This page is general information only and is not medical or veterinary advice."
+        }
+      };
+    }
   },
   dentist: {
     icon: "🦷",
@@ -1056,6 +1279,32 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       </div>
     </div>
   </section>
+  ` : ""}${content.practitioners ? `
+  <section id="practitioners" class="py-20 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-12">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${content.practitioners.eyebrow}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.practitioners.heading}</h2>
+        <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.practitioners.note}</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        ${content.practitioners.items.map((p: any) => `
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold mb-4" style="background:${data.primaryColor}"><i class="fas ${content.practitioners.icon}"></i></div>
+          <h3 class="text-lg font-bold text-gray-900">${p.name}</h3>
+          <div class="mt-4 space-y-2">
+            ${p.details.map((d: any) => `
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-widest text-gray-400">${d.label}</div>
+              <div class="text-sm font-semibold text-gray-700">${d.value}</div>
+            </div>
+            `).join("")}
+          </div>
+        </div>
+        `).join("")}
+      </div>
+    </div>
+  </section>
   ` : ""}
 
   ${content.processSteps ? `
@@ -1129,7 +1378,8 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       </div>
       <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
         <p class="text-lg text-gray-700 leading-relaxed max-w-2xl mx-auto">${content.fees.text}</p>
-        <div class="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white" style="background:${data.primaryColor}">${content.fees.placeholder}</div>
+        <div class="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white" style="background:${data.primaryColor}">${content.fees.placeholder}</div>${content.fees.extra ? `
+        <div class="mt-3 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white" style="background:${data.primaryColor}">${content.fees.extra}</div>` : ""}
         <p class="mt-6 text-xs text-gray-500 max-w-xl mx-auto">${content.fees.note}</p>
       </div>
     </div>
