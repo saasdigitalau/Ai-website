@@ -87,6 +87,74 @@ const TRADE_VARIANTS: Record<TradeVariant, {
   },
 };
 
+// One `legal` template, two variants. A law firm and an accounting practice want
+// the same page shape — practice areas, how a matter runs, credentials, fees,
+// office — but different practice-area names and credential wording, so the
+// variant is picked from the description instead of duplicating the template.
+type LegalVariant = "legal" | "accounting";
+
+const LEGAL_VARIANT_KEYWORDS: Record<LegalVariant, string[]> = {
+  legal: ["solicitor", "lawyer", "law firm", "law practice", "legal practice", "conveyanc", "barrister", "family law", "wills", "estate planning", "litigation", "legal advice", "legal services"],
+  accounting: ["accountant", "accounting", "bookkeep", "tax agent", "tax return", "chartered accountant", "cpa", "payroll", "bas agent", "bas lodgement", "auditor"],
+};
+
+function pickLegalVariant(description: string): LegalVariant {
+  const lower = (description || "").toLowerCase();
+  for (const variant of ["legal", "accounting"] as LegalVariant[]) {
+    if (LEGAL_VARIANT_KEYWORDS[variant].some((kw) => lower.includes(kw))) return variant;
+  }
+  // Matched the template without naming a practice — solicitors are the broader
+  // reading of "legal & accounting", so legal is the least wrong guess.
+  return "legal";
+}
+
+const LEGAL_VARIANTS: Record<LegalVariant, {
+  badge: string;
+  heroLine: string;
+  credentialsHeading: string;
+  credentialItems: { label: string; value: string }[];
+  practiceAreas: { title: string; desc: string }[];
+}> = {
+  legal: {
+    badge: "Solicitors & conveyancing",
+    heroLine: "Conveyancing, family law, wills and estates, and business matters, explained in plain language.",
+    credentialsHeading: "Qualified and accountable",
+    credentialItems: [
+      { label: "Practising certificate", value: "[Your practising certificate]" },
+      { label: "ABN", value: "[Your ABN]" },
+      { label: "Professional body", value: "[Your professional body membership]" },
+      { label: "In practice", value: "[Years in practice]" },
+    ],
+    practiceAreas: [
+      { title: "Conveyancing", desc: "Contracts, searches and settlement for buying or selling a property, with each step explained as it happens." },
+      { title: "Family law", desc: "Separation, parenting arrangements and property matters, working towards agreement before court where that is possible." },
+      { title: "Wills & estates", desc: "Wills, powers of attorney and probate, drafted around what you want to happen." },
+      { title: "Employment", desc: "Contracts, unfair dismissal and workplace disputes for employers and employees." },
+      { title: "Business law", desc: "Company setup, commercial contracts, leases and shareholder agreements for small businesses." },
+      { title: "Dispute resolution", desc: "Letters of demand, mediation and court work when a disagreement cannot be settled between the parties." },
+    ],
+  },
+  accounting: {
+    badge: "Accountants & bookkeepers",
+    heroLine: "Tax returns, bookkeeping and BAS, company setup and business advisory, explained in plain language.",
+    credentialsHeading: "Registered and accountable",
+    credentialItems: [
+      { label: "Registration", value: "[Your registration type]" },
+      { label: "ABN", value: "[Your ABN]" },
+      { label: "Professional body", value: "[Your professional body membership]" },
+      { label: "In practice", value: "[Years in practice]" },
+    ],
+    practiceAreas: [
+      { title: "Tax returns", desc: "Individual and business returns prepared and lodged, with the records needed listed up front." },
+      { title: "Bookkeeping & BAS", desc: "Regular bookkeeping and BAS lodgement, so the figures are current before year end." },
+      { title: "Company & trust setup", desc: "Company, trust and ABN registrations set up, with the structure explained in plain language." },
+      { title: "Payroll", desc: "Payroll processing, superannuation and payroll reporting for your team." },
+      { title: "Business advisory", desc: "Cash flow, budgeting and structure reviews when you are making a decision about the business." },
+      { title: "Audit support", desc: "Records and reconciliations prepared for an audit or a review, with what is needed listed clearly." },
+    ],
+  },
+};
+
 const BUSINESS_TEMPLATES: Record<string, any> = {
   restaurant: {
     icon: "🍽️",
@@ -456,6 +524,93 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       };
     }
   },
+  legal: {
+    icon: "⚖️",
+    // Practice wording only, and no bare "law", "tax", "firm", "advice" or
+    // "services": a taxi service, a law-adjacent shop or a generic firm must
+    // still fall through to `general`. Multi-word keywords only.
+    keywords: ["solicitor", "lawyer", "law firm", "law practice", "legal practice", "conveyancer", "conveyancing", "barrister", "family law", "wills and estates", "wills & estates", "estate planning", "litigation", "accountant", "accounting", "bookkeeper", "bookkeeping", "tax agent", "tax return", "chartered accountant", "payroll services"],
+    defaultName: "Your Practice",
+    // Bronze accent on deep navy, the way a practice site usually reads. The
+    // secondary colour is dark: it drives the dark hero and the office panel, and
+    // generateHtml forces the contact section light when darkHero is set.
+    primaryColor: "#b45309",
+    secondaryColor: "#0f172a",
+    fontFamily: "'Inter', sans-serif",
+    generateContent: (name: string, desc: string) => {
+      const variant = pickLegalVariant(desc);
+      const v = LEGAL_VARIANTS[variant];
+      return {
+        legalVariant: variant,
+        darkHero: true,
+        // The practice name is the headline; the customer's own description is
+        // the sub-line. No invented tagline or claim.
+        heroBadge: v.badge,
+        heroTitle: name,
+        heroSubtitle: desc ? asSentence(desc) : v.heroLine,
+        ctaPrimary: { label: "Book a consultation", href: "#contact" },
+        // No enquiry form: a form that posts nowhere is a fake. Phone only.
+        ctaSecondary: { label: "Call [Your phone number]", href: "tel:[Your phone number]" },
+        navLinks: [
+          { label: "Practice areas", href: "#services" },
+          { label: "How it works", href: "#process" },
+          { label: "Fees", href: "#fees" },
+          { label: "Office", href: "#office" }
+        ],
+        // A practice page is practice areas, how a matter runs, credentials, fees,
+        // office and contact — not an "about us" essay plus review cards, so the
+        // two standard sections are switched off for this template only.
+        hideAbout: true,
+        hideTestimonials: true,
+        servicesHeading: "Practice areas",
+        services: v.practiceAreas.map((p) => ({ title: p.title, desc: p.desc, price: "" })),
+        processSteps: {
+          heading: "How it works",
+          note: "Three steps, the same for every matter.",
+          steps: [
+            { title: "First meeting", desc: "We talk through what you need and the documents you already have, and set out the options in plain language." },
+            { title: "We handle the paperwork", desc: "Drafting, lodgement and correspondence are handled for you, with a list of what is needed from you at each stage." },
+            { title: "You are kept informed", desc: "You get an update at each milestone, and you can call your contact directly with a question." }
+          ]
+        },
+        // Credentials are placeholders. Nothing here is invented: the practice
+        // types in its own certificate, registration, ABN and memberships.
+        credentials: {
+          heading: v.credentialsHeading,
+          note: "Placeholder details — replace with your own registration, ABN, professional body memberships and years in practice.",
+          items: v.credentialItems
+        },
+        // Fees are quoted per matter. No price, no "fixed fee", no "free
+        // consultation", no success rate, no award — none of that is knowable here.
+        fees: {
+          eyebrow: "Fees",
+          heading: "Fees are quoted per matter",
+          text: "Every matter is different, so fees are quoted per matter after the first meeting, once we know what is involved. You are told what it will cost before any work starts.",
+          placeholder: "[Your fee structure]",
+          note: "No prices are shown on this page. Replace this with your own fee structure — hourly rates, fixed-fee options or scale fees."
+        },
+        // Office and service area. Hours are the practice's own, never "24/7".
+        office: {
+          eyebrow: "Office",
+          heading: "Where to find us",
+          lead: "Based in [Suburb], working with clients across [Suburb 2] and surrounds",
+          address: "[Your street address], [Suburb]",
+          hours: "[Your opening hours]",
+          note: "Placeholder details — replace with your own office address, the suburbs you service and your opening hours.",
+          suburbs: ["[Suburb 1]", "[Suburb 2]", "[Suburb 3]", "[Suburb 4]"]
+        },
+        contactInfo: {
+          address: "[Your street address]",
+          phone: "[Your phone number]",
+          phoneLink: true,
+          email: "[Your email]",
+          hours: "[Your opening hours]",
+          // One short line so nobody mistakes a generated page for advice.
+          note: "General information only — nothing on this page is legal or financial advice."
+        }
+      };
+    }
+  },
   general: {
     icon: "💼",
     keywords: ["business", "professional", "services", "consulting", "agency", "studio", "shop"],
@@ -573,10 +728,10 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
         <span class="font-bold text-lg">${data.name}</span>
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-        <a href="#about" class="hover:text-gray-900">${T("About", lang)}</a>
+        ${content.hideAbout ? "" : `<a href="#about" class="hover:text-gray-900">${T("About", lang)}</a>`}
         <a href="#services" class="hover:text-gray-900">${T("Services", lang)}</a>
         ${(content.navLinks || []).map((l: any) => `<a href="${l.href}" class="hover:text-gray-900">${l.label}</a>`).join("")}
-        <a href="#testimonials" class="hover:text-gray-900">${T("Testimonials", lang)}</a>
+        ${content.hideTestimonials ? "" : `<a href="#testimonials" class="hover:text-gray-900">${T("Testimonials", lang)}</a>`}
         <a href="#contact" class="hover:text-gray-900">${T("Contact", lang)}</a>
       </div>
     </div>
@@ -608,13 +763,13 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   </section>
   ` : ""}
 
-  <section id="about" class="py-20 px-6">
+  ${content.hideAbout ? "" : `<section id="about" class="py-20 px-6">
     <div class="max-w-4xl mx-auto text-center">
       <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("About", lang)}</div>
       <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.aboutHeading || T("Our Story", lang)}</h2>
       <p class="mt-6 text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">${content.aboutText}</p>
     </div>
-  </section>
+  </section>`}
 
   <section id="services" class="py-20 px-6 bg-gray-50">
     <div class="max-w-6xl mx-auto">
@@ -717,6 +872,48 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       </div>
     </div>
   </section>
+  ` : ""}${content.fees ? `
+  <section id="fees" class="py-20 px-6 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${content.fees.eyebrow}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.fees.heading}</h2>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
+        <p class="text-lg text-gray-700 leading-relaxed max-w-2xl mx-auto">${content.fees.text}</p>
+        <div class="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white" style="background:${data.primaryColor}">${content.fees.placeholder}</div>
+        <p class="mt-6 text-xs text-gray-500 max-w-xl mx-auto">${content.fees.note}</p>
+      </div>
+    </div>
+  </section>
+  ` : ""}${content.office ? `
+  <section id="office" class="py-20 px-6" style="background:${data.secondaryColor}">
+    <div class="max-w-5xl mx-auto">
+      <div class="text-center">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor};color:${data.secondaryColor}">${content.office.eyebrow}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-white">${content.office.heading}</h2>
+        <p class="mt-4 text-sm text-slate-300 max-w-xl mx-auto">${content.office.note}</p>
+      </div>
+      <div class="mt-10 grid md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+        <div class="rounded-2xl p-5 text-center bg-white/10 border border-white/20">
+          <i class="fas fa-map-marker-alt text-xl mb-3" style="color:${data.primaryColor}"></i>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Address</div>
+          <div class="text-sm font-semibold text-white">${content.office.address}</div>
+        </div>
+        <div class="rounded-2xl p-5 text-center bg-white/10 border border-white/20">
+          <i class="fas fa-clock text-xl mb-3" style="color:${data.primaryColor}"></i>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Opening hours</div>
+          <div class="text-sm font-semibold text-white">${content.office.hours}</div>
+        </div>
+      </div>
+      <p class="mt-8 text-center text-lg font-bold text-white">${content.office.lead}</p>
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        ${content.office.suburbs.map((s: string) => `
+        <span class="px-4 py-2 rounded-full text-sm font-semibold text-white bg-white/10 border border-white/20">${s}</span>
+        `).join("")}
+      </div>
+    </div>
+  </section>
   ` : ""}
 
   ${content.workGallery ? `
@@ -745,7 +942,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   </section>
   ` : ""}
 
-  <section id="testimonials" class="py-20 px-6">
+  ${content.hideTestimonials ? "" : `<section id="testimonials" class="py-20 px-6">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12">
         <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Testimonials", lang)}</div>
@@ -764,7 +961,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
         `).join("")}
       </div>
     </div>
-  </section>
+  </section>`}
 
   <section id="contact" class="py-20 px-6" style="background:${contactBg}">
     <div class="max-w-4xl mx-auto">
@@ -796,7 +993,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
         ${/^\[/.test(content.contactInfo.email)
           ? `<span class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg" style="background:${data.primaryColor}"><i class="fas fa-envelope"></i> ${content.contactInfo.email}</span>`
           : `<a href="mailto:${content.contactInfo.email}" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg hover:brightness-110 transition-all" style="background:${data.primaryColor}"><i class="fas fa-envelope"></i> ${content.contactInfo.email}</a>`}
-      </div>
+      </div>${content.contactInfo.note ? `<p class="mt-8 text-xs text-gray-500 max-w-xl mx-auto text-center">${content.contactInfo.note}</p>` : ""}
     </div>
   </section>
 
