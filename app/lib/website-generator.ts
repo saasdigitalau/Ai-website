@@ -155,6 +155,129 @@ const LEGAL_VARIANTS: Record<LegalVariant, {
   },
 };
 
+// One `portfolio` template, three variants. A photographer, a celebrant and a venue
+// want the same gallery-first page shape — gallery, packages, how booking works,
+// approach, where I work, contact — but different packages, call to action and hire
+// detail block, so the variant is picked from the description instead of duplicating
+// the whole template.
+type PortfolioVariant = "photographer" | "celebrant" | "venue";
+
+// Multi-word or unambiguous wording only. Bare "photo", "venue", "studio", "space",
+// "event", "wedding", "hire", "booking" and "services" are deliberately absent: they
+// would swallow restaurants with function rooms, generic studios and event catering,
+// which must keep falling through to `general`.
+const PORTFOLIO_VARIANT_KEYWORDS: Record<PortfolioVariant, string[]> = {
+  photographer: ["photographer", "photography", "photo studio", "portrait photographer", "wedding photographer", "headshot", "portrait session"],
+  celebrant: ["celebrant", "marriage celebrant", "wedding celebrant", "funeral celebrant", "naming ceremony", "vow renewal"],
+  venue: ["wedding venue", "function room", "function centre", "function center", "event space", "reception venue", "venue hire", "hire the venue"],
+};
+
+function pickPortfolioVariant(description: string): PortfolioVariant {
+  const lower = (description || "").toLowerCase();
+  for (const variant of ["photographer", "celebrant", "venue"] as PortfolioVariant[]) {
+    if (PORTFOLIO_VARIANT_KEYWORDS[variant].some((kw) => lower.includes(kw))) return variant;
+  }
+  // Matched the template without naming which — photography is the broadest reading
+  // of "portfolio businesses", so photographer is the least wrong guess.
+  return "photographer";
+}
+
+const PORTFOLIO_VARIANTS: Record<PortfolioVariant, {
+  badge: string;
+  heroLine: string;
+  cta: string;
+  galleryHeading: string;
+  galleryTag: string;
+  packages: { title: string; desc: string }[];
+  bookingSteps: { title: string; desc: string }[];
+  approachHeading: string;
+  approachLine: string;
+  areaEyebrow: string;
+  areaLead: string;
+  areaNote: string;
+  hireDetails?: { eyebrow: string; heading: string; note: string; items: { label: string; value: string }[] };
+}> = {
+  photographer: {
+    badge: "Photography",
+    heroLine: "Weddings, portraits and events, photographed in [Suburb] and surrounds.",
+    cta: "Check availability",
+    galleryHeading: "Recent work",
+    galleryTag: "Photograph",
+    packages: [
+      { title: "Half-day coverage", desc: "Up to [Your hours] on the day for a ceremony, portrait session or event, with the edited photographs delivered afterwards." },
+      { title: "Full-day coverage", desc: "Coverage from preparation through to the end of the day, with the edited photographs delivered afterwards." },
+      { title: "Portrait session", desc: "A shorter studio or outdoor session for headshots, couples or family photographs, with the edited photographs delivered afterwards." },
+    ],
+    bookingSteps: [
+      { title: "Enquire", desc: "Send your date, the location and what you have in mind, and you get a reply with availability." },
+      { title: "Date and quote confirmed", desc: "The package, the coverage and the price are agreed in writing before anything is locked in." },
+      { title: "Booking secured", desc: "A deposit and a signed agreement secure the date, and the shoot is planned from there." },
+    ],
+    approachHeading: "How I work",
+    approachLine: "Every booking is planned around your date, the location and what you want the photographs for, so nothing on the day is improvised.",
+    areaEyebrow: "Where I work",
+    areaLead: "Based in [Suburb], working across [Suburb 2] and surrounds",
+    areaNote: "Placeholder suburbs — replace with the areas you work in. Travel outside [Suburb] is quoted with the package, and sessions run by appointment.",
+  },
+  celebrant: {
+    badge: "Marriage & funeral celebrancy",
+    heroLine: "Marriage, funeral and naming ceremonies, written with you and held in [Suburb] and surrounds.",
+    cta: "Enquire about your date",
+    galleryHeading: "Recent ceremonies",
+    galleryTag: "Ceremony",
+    packages: [
+      { title: "Marriage ceremony", desc: "The ceremony written with you, a run-through before the day, and the paperwork lodged after the ceremony." },
+      { title: "Funeral or memorial service", desc: "A service written with the family, with help preparing the eulogy and the order of service, held where the family chooses." },
+      { title: "Naming ceremony", desc: "A welcome for a new child, written with the family and held wherever suits you." },
+    ],
+    bookingSteps: [
+      { title: "Enquire about your date", desc: "Send your date and the kind of ceremony, and you get a reply confirming whether the date is free." },
+      { title: "Date and quote confirmed", desc: "We talk through the ceremony you want, and the date and the price are confirmed in writing." },
+      { title: "Booking secured", desc: "The booking is secured and the notice and paperwork requirements are set out for you." },
+    ],
+    approachHeading: "How I work",
+    approachLine: "Ceremonies are written with you — the words are yours, and there is a run-through before the day.",
+    areaEyebrow: "Where I work",
+    areaLead: "Based in [Suburb], officiating in [Suburb 2] and surrounds",
+    areaNote: "Placeholder suburbs — replace with the areas you travel to. [Your notice period] is needed before a date can be confirmed.",
+  },
+  venue: {
+    badge: "Venue hire",
+    heroLine: "A [Suburb] venue for weddings, parties and functions, with capacity and hire details confirmed on enquiry.",
+    cta: "Check availability",
+    galleryHeading: "The venue",
+    galleryTag: "Venue",
+    packages: [
+      { title: "Ceremony and reception", desc: "Hire of the ceremony space and the reception room, with tables and seating set up as agreed." },
+      { title: "Function hire", desc: "Hire of the function room for an agreed period, with the layout and access times confirmed beforehand." },
+      { title: "Exclusive-use day", desc: "Exclusive use of the venue for the day, including set-up and pack-down time." },
+    ],
+    bookingSteps: [
+      { title: "Enquire", desc: "Send your date, your guest numbers and what the event is, and you get a reply with availability." },
+      { title: "Inspection and quote", desc: "Come and look through the venue, and the hire period and the price are confirmed in writing." },
+      { title: "Booking secured", desc: "A deposit and a signed hire agreement secure the date." },
+    ],
+    approachHeading: "About the venue",
+    approachLine: "Hire is arranged around your date, your guest numbers and how you want the room set up.",
+    areaEyebrow: "Where to find us",
+    areaLead: "At [Suburb], with guests travelling from [Suburb 2] and surrounds",
+    areaNote: "Placeholder suburbs — replace with your own location and the areas your guests travel from. Access times are confirmed with the hire agreement.",
+    // Capacity and hire terms are placeholders. Nothing here is invented: the venue
+    // types in its own capacity, hire period, inclusions and deposit terms.
+    hireDetails: {
+      eyebrow: "Hire details",
+      heading: "Capacity and hire",
+      note: "Placeholder details — replace with your own capacity, hire periods, inclusions and deposit terms.",
+      items: [
+        { label: "Capacity", value: "[Your capacity]" },
+        { label: "Hire period", value: "[Your hire period]" },
+        { label: "Included", value: "[What's included]" },
+        { label: "Deposit", value: "[Your deposit terms]" },
+      ],
+    },
+  },
+};
+
 const BUSINESS_TEMPLATES: Record<string, any> = {
   restaurant: {
     icon: "🍽️",
@@ -611,6 +734,99 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       };
     }
   },
+  portfolio: {
+    icon: "📸",
+    // Portfolio wording only, and no bare "photo", "wedding", "venue", "studio",
+    // "space", "event", "hire", "booking" or "services": a restaurant with a
+    // function room, a generic studio and an event caterer must still fall through
+    // to their own template. Multi-word or unambiguous terms only.
+    keywords: ["photographer", "photography", "photo studio", "portrait photographer", "wedding photographer", "headshot", "portrait session", "celebrant", "marriage celebrant", "wedding celebrant", "funeral celebrant", "naming ceremony", "vow renewal", "wedding venue", "function room", "function centre", "function center", "event space", "reception venue", "venue hire", "hire the venue"],
+    defaultName: "Your Business Name",
+    // Teal accent on near-black. secondaryColor is the dark panel behind the gallery
+    // tiles and the service-area section, so darkHero is set: generateHtml then paints
+    // the hero dark with white headings and forces the contact section light.
+    primaryColor: "#0f766e",
+    secondaryColor: "#111827",
+    fontFamily: "'Inter', sans-serif",
+    generateContent: (name: string, desc: string) => {
+      const variant = pickPortfolioVariant(desc);
+      const v = PORTFOLIO_VARIANTS[variant];
+      return {
+        portfolioVariant: variant,
+        darkHero: true,
+        // Serif headings over the sans body set above.
+        headingFontFamily: "'DM Serif Display', serif",
+        // The business name is the headline; the customer's own description is the
+        // sub-line. No invented tagline, no award, no client count.
+        heroBadge: v.badge,
+        heroTitle: name,
+        heroSubtitle: desc ? asSentence(desc) : v.heroLine,
+        ctaPrimary: { label: v.cta, href: "#contact" },
+        // No enquiry form: a form that posts nowhere is a fake. Phone only.
+        ctaSecondary: { label: "Call [Your phone number]", href: "tel:[Your phone number]" },
+        navLinks: [
+          { label: "Gallery", href: "#gallery" },
+          { label: "Booking", href: "#process" },
+          { label: v.areaEyebrow, href: "#service-area" }
+        ],
+        // Gallery first: six placeholder tiles and no images at all — no <img>, no
+        // stock photography and no link to a portfolio that does not exist.
+        portfolioGallery: {
+          eyebrow: "Gallery",
+          heading: v.galleryHeading,
+          note: "Placeholder tiles — add your own photos here. No images are included with this page.",
+          items: [1, 2, 3, 4, 5, 6].map((n) => ({
+            label: `[Your photo ${n}]`,
+            tag: v.galleryTag,
+            caption: "[Photo caption]"
+          }))
+        },
+        // A portfolio page is gallery, packages, how booking works, approach, where I
+        // work and contact — not an "about us" essay plus review cards, so the two
+        // standard sections are switched off for this template only.
+        hideAbout: true,
+        hideTestimonials: true,
+        servicesEyebrow: "Packages",
+        servicesHeading: "Packages",
+        servicesNavLabel: "Packages",
+        // No price is invented: never "from $X", never a discount.
+        servicesNote: "Package prices are confirmed on enquiry, once the date, location and what is needed are known.",
+        services: v.packages.map((p) => ({ title: p.title, desc: p.desc, price: "[Your package price]" })),
+        processSteps: {
+          heading: "How booking works",
+          note: "Three steps, the same for every booking.",
+          steps: v.bookingSteps
+        },
+        // The approach section replaces the standard About block (see hideAbout
+        // above) so the gallery can sit directly under the hero.
+        approach: {
+          eyebrow: "Approach",
+          heading: v.approachHeading,
+          text: `${name}. ${desc ? asSentence(desc) : v.heroLine} ${v.approachLine}`
+        },
+        // Where I work. Suburbs and travel/notice terms are placeholders; the hours
+        // are the customer's own, never "24/7".
+        serviceArea: {
+          eyebrow: v.areaEyebrow,
+          lead: v.areaLead,
+          note: v.areaNote,
+          suburbs: ["[Suburb 1]", "[Suburb 2]", "[Suburb 3]", "[Suburb 4]"]
+        },
+        // Venues only: capacity and hire terms. Undefined for the other two variants,
+        // which leaves the block out of their pages entirely.
+        credentials: v.hireDetails,
+        contactInfo: {
+          address: "[Your street address]",
+          phone: "[Your phone number]",
+          phoneLink: true,
+          email: "[Your email]",
+          hours: "[Your opening hours]",
+          // One short line so nobody mistakes a generated page for a confirmed date.
+          note: "Availability is confirmed before any booking is made."
+        }
+      };
+    }
+  },
   general: {
     icon: "💼",
     keywords: ["business", "professional", "services", "consulting", "agency", "studio", "shop"],
@@ -729,7 +945,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       </div>
       <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
         ${content.hideAbout ? "" : `<a href="#about" class="hover:text-gray-900">${T("About", lang)}</a>`}
-        <a href="#services" class="hover:text-gray-900">${T("Services", lang)}</a>
+        <a href="#services" class="hover:text-gray-900">${content.servicesNavLabel || T("Services", lang)}</a>
         ${(content.navLinks || []).map((l: any) => `<a href="${l.href}" class="hover:text-gray-900">${l.label}</a>`).join("")}
         ${content.hideTestimonials ? "" : `<a href="#testimonials" class="hover:text-gray-900">${T("Testimonials", lang)}</a>`}
         <a href="#contact" class="hover:text-gray-900">${T("Contact", lang)}</a>
@@ -761,6 +977,30 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       <span class="text-white">— ${content.availability.detail}</span>
     </div>
   </section>
+  ` : ""}${content.portfolioGallery ? `
+  <section id="gallery" class="py-20 px-6 bg-gray-50">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-12">
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${content.portfolioGallery.eyebrow}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.portfolioGallery.heading}</h2>
+        <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.portfolioGallery.note}</p>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        ${content.portfolioGallery.items.map((g: any) => `
+        <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          <div class="h-40 md:h-52 flex flex-col items-center justify-center gap-2 border-b border-dashed border-gray-300" style="background:${data.secondaryColor}0d">
+            <i class="fas fa-image text-xl" style="color:${data.primaryColor}"></i>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-center px-4" style="color:${data.primaryColor}">${g.label}</span>
+          </div>
+          <div class="p-4">
+            <div class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">${g.tag}</div>
+            <div class="text-sm font-bold text-gray-900">${g.caption}</div>
+          </div>
+        </div>
+        `).join("")}
+      </div>
+    </div>
+  </section>
   ` : ""}
 
   ${content.hideAbout ? "" : `<section id="about" class="py-20 px-6">
@@ -774,8 +1014,8 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   <section id="services" class="py-20 px-6 bg-gray-50">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-12">
-        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${T("Services", lang)}</div>
-        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.servicesHeading || T("What We Offer", lang)}</h2>
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${content.servicesEyebrow || T("Services", lang)}</div>
+        <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.servicesHeading || T("What We Offer", lang)}</h2>${content.servicesNote ? `<p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.servicesNote}</p>` : ""}
       </div>
       <div class="grid md:grid-cols-3 gap-6">
         ${content.services.map((s: any) => `
@@ -837,6 +1077,14 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
       </div>
     </div>
   </section>
+  ` : ""}${content.approach ? `
+  <section id="approach" class="py-20 px-6">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${content.approach.eyebrow}</div>
+      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900">${content.approach.heading}</h2>
+      <p class="mt-6 text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">${content.approach.text}</p>
+    </div>
+  </section>
   ` : ""}
 
   ${content.serviceArea ? `
@@ -858,7 +1106,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   <section id="credentials" class="py-16 px-6 bg-white border-b border-gray-100">
     <div class="max-w-6xl mx-auto">
       <div class="text-center mb-10">
-        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">Credentials</div>
+        <div class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest mb-4" style="background:${data.primaryColor}10;color:${data.primaryColor}">${content.credentials.eyebrow || "Credentials"}</div>
         <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900">${content.credentials.heading}</h2>
         <p class="mt-4 text-sm text-gray-500 max-w-xl mx-auto">${content.credentials.note}</p>
       </div>
