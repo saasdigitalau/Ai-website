@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { resolveEntitlement } from "@/lib/entitlements";
 
 const BUSINESS_BLOG_PROMPTS: Record<string, { topics: string[]; tone: string; angle: string }> = {
   restaurant: {
@@ -118,9 +119,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Deduct site credits
+    // Deduct site credits. The plan checked is the one the account is entitled
+    // to right now: a cancelled subscription keeps it until the paid month ends.
+    const plan = resolveEntitlement(dbUser).plan;
     const creditsNeeded = count;
-    if (dbUser.aiCredits < creditsNeeded && dbUser.plan !== "business") {
+    if (dbUser.aiCredits < creditsNeeded && plan !== "business") {
       return NextResponse.json({ error: "Insufficient site credits" }, { status: 402 });
     }
 
@@ -152,7 +155,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update credits
-    if (dbUser.plan !== "business") {
+    if (plan !== "business") {
       await prisma.user.update({
         where: { id: dbUser.id },
         data: { aiCredits: dbUser.aiCredits - creditsNeeded },
@@ -162,7 +165,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       posts,
       creditsUsed: creditsNeeded,
-      creditsRemaining: dbUser.plan === "business" ? "unlimited" : dbUser.aiCredits - creditsNeeded,
+      creditsRemaining: plan === "business" ? "unlimited" : dbUser.aiCredits - creditsNeeded,
     });
   } catch (error) {
     console.error("Blog generation error:", error);

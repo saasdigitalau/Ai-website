@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { UserButton } from "@clerk/nextjs";
 import WhiteLabelSettings from "@/components/white-label-settings";
 import PlanUpgrade from "@/components/plan-upgrade";
+import { describeCancellation, resolveEntitlement } from "@/lib/entitlements";
 
 export default async function SettingsPage() {
   const user = await currentUser();
@@ -12,6 +13,11 @@ export default async function SettingsPage() {
   const dbUser = await prisma.user.findUnique({
     where: { clerkId: user.id },
   });
+
+  // What the account may use right now: a cancelled subscription keeps its plan
+  // until the end of the month already paid for.
+  const entitlement = resolveEntitlement(dbUser);
+  const cancellationNote = describeCancellation(entitlement);
 
   return (
     <div>
@@ -47,11 +53,14 @@ export default async function SettingsPage() {
             <div>
               <div className="text-sm text-gray-500">Current Plan</div>
               <div className="text-xl font-extrabold text-gray-900 capitalize">
-                {dbUser?.plan || "Free"}
+                {entitlement.plan}
               </div>
             </div>
           </div>
-          <PlanUpgrade currentPlan={dbUser?.plan || "free"} />
+          {cancellationNote && (
+            <p className="mb-4 text-xs text-amber-600">{cancellationNote}</p>
+          )}
+          <PlanUpgrade currentPlan={entitlement.plan} />
           <div className="mt-4 text-xs text-gray-400">
             Site Credits: {dbUser?.aiCredits ?? 0}
           </div>

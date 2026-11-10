@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import DashboardNav from "@/components/dashboard-nav";
+import { resolveEntitlement } from "@/lib/entitlements";
 
 export default async function DashboardLayout({
   children,
@@ -14,7 +15,7 @@ export default async function DashboardLayout({
 
   try {
     const { prisma } = await import("@/lib/prisma");
-    dbUser = await prisma.user.upsert({
+    const row = await prisma.user.upsert({
       where: { clerkId: user.id },
       create: {
         clerkId: user.id,
@@ -25,6 +26,15 @@ export default async function DashboardLayout({
       },
       update: {},
     });
+    // The plan shown is the one the account is entitled to right now, so a
+    // cancelled subscription keeps its tier until the paid month ends.
+    dbUser = {
+      clerkId: row.clerkId,
+      email: row.email || "",
+      name: row.name || "User",
+      plan: resolveEntitlement(row).plan,
+      aiCredits: row.aiCredits,
+    };
   } catch {
     // Database not connected — use Clerk data as fallback
     dbUser = {
