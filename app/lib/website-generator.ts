@@ -290,7 +290,7 @@ type HealthVariant = "allied" | "vet";
 // absent: they would swallow a medical centre, a childcare centre and every generic
 // "services" business, which must keep falling through to their own template.
 const HEALTH_VARIANT_KEYWORDS: Record<HealthVariant, string[]> = {
-  allied: ["physiotherapist", "physiotherapy", "physio", "chiropractor", "chiropractic", "osteopath", "podiatrist", "podiatry", "myotherapist", "remedial massage", "occupational therapist", "speech pathologist", "psychologist", "dietitian", "allied health"],
+  allied: ["physiotherapist", "physiotherapy", "physio", "chiropractor", "chiropractic", "osteopath", "podiatrist", "podiatry", "myotherapist", "remedial massage", "occupational therapist", "speech pathologist", "psychologist", "dietitian", "allied health", "medical clinic", "medical practice"],
   vet: ["veterinary clinic", "vet clinic", "veterinarian", "animal hospital", "vet hospital", "veterinary surgeon", "veterinary practice", "vet practice"],
 };
 
@@ -522,14 +522,56 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       }
     })
   },
+  dentist: {
+    icon: "🦷",
+    // No bare "clinic": it swallowed every veterinary and medical clinic into
+    // dentistry. "dental" still catches "a dental clinic", and because "clinic" is
+    // gone this entry can sit ahead of `health` without stealing its traffic.
+    keywords: ["dentist", "teeth", "orthodontist", "oral", "smile", "dental", "hygiene"],
+    defaultName: "Bright Smile Dental",
+    primaryColor: "#0284c7",
+    secondaryColor: "#f0f9ff",
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    generateContent: (name: string, desc: string) => ({
+      heroTitle: `Your Brightest Smile Starts at ${name}`,
+      heroSubtitle: `Gentle, modern dentistry. We make every visit comfortable.`,
+      aboutText: desc
+        ? `${name}. ${asSentence(desc)}`
+        : `${name} provides comprehensive dental care with cutting-edge technology. Your comfort and smile are our top priorities.`,
+      services: [
+        { title: "General Dentistry", desc: "Cleanings, exams, and preventive care.", price: "[Your price]" },
+        { title: "Cosmetic", desc: "Whitening, veneers, and smile makeovers.", price: "[Your price]" },
+        { title: "Orthodontics", desc: "Invisalign and braces for all ages.", price: "[Your price]" }
+      ],
+      testimonials: [
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        },
+        {
+          name: "[Customer name]",
+          text: "Sample review — replace with a real customer quote.",
+          role: "[Customer role]",
+          stars: 0
+        }
+      ],
+      contactInfo: {
+        address: "[Your street address]",
+        phone: "[Your phone number]",
+        email: "[your@email]",
+        hours: "[Your opening hours]"
+      }
+    })
+  },
   health: {
     icon: "🩺",
     // Named professions and multi-word clinic wording only — no bare "health",
-    // "clinic", "care", "therapy", "vet", "medical", "doctor" or "services". This
-    // entry sits BEFORE `dentist` on purpose: the dentist entry owns the bare keyword
-    // "clinic", so without that "a veterinary clinic in Joondalup" would route to
-    // dentistry. It carries no dentist wording, so "a dentist in Perth" still lands
-    // on `dentist`.
+    // "clinic", "care", "therapy", "vet", "medical", "doctor" or "services". It sits
+    // AFTER `dentist` now that dentistry no longer owns the bare keyword "clinic":
+    // "a veterinary clinic" and "a medical clinic" both land here, and "a dental
+    // clinic" still lands on `dentist` through its own "dental" keyword.
     keywords: [...HEALTH_VARIANT_KEYWORDS.allied, ...HEALTH_VARIANT_KEYWORDS.vet],
     defaultName: "Your Clinic",
     // Deep-green accent on a near-black green. secondaryColor drives the dark hero and
@@ -620,46 +662,6 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
       };
     }
   },
-  dentist: {
-    icon: "🦷",
-    keywords: ["dentist", "teeth", "orthodontist", "clinic", "oral", "smile", "dental", "hygiene"],
-    defaultName: "Bright Smile Dental",
-    primaryColor: "#0284c7",
-    secondaryColor: "#f0f9ff",
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    generateContent: (name: string, desc: string) => ({
-      heroTitle: `Your Brightest Smile Starts at ${name}`,
-      heroSubtitle: `Gentle, modern dentistry. We make every visit comfortable.`,
-      aboutText: desc
-        ? `${name}. ${asSentence(desc)}`
-        : `${name} provides comprehensive dental care with cutting-edge technology. Your comfort and smile are our top priorities.`,
-      services: [
-        { title: "General Dentistry", desc: "Cleanings, exams, and preventive care.", price: "[Your price]" },
-        { title: "Cosmetic", desc: "Whitening, veneers, and smile makeovers.", price: "[Your price]" },
-        { title: "Orthodontics", desc: "Invisalign and braces for all ages.", price: "[Your price]" }
-      ],
-      testimonials: [
-        {
-          name: "[Customer name]",
-          text: "Sample review — replace with a real customer quote.",
-          role: "[Customer role]",
-          stars: 0
-        },
-        {
-          name: "[Customer name]",
-          text: "Sample review — replace with a real customer quote.",
-          role: "[Customer role]",
-          stars: 0
-        }
-      ],
-      contactInfo: {
-        address: "[Your street address]",
-        phone: "[Your phone number]",
-        email: "[your@email]",
-        hours: "[Your opening hours]"
-      }
-    })
-  },
   yoga: {
     icon: "🧘",
     keywords: ["yoga", "pilates", "meditation", "mindfulness", "zen", "breathwork", "wellness"],
@@ -722,9 +724,7 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
         { label: "How it works", href: "#process" }
       ],
       aboutHeading: "About your agent",
-      aboutText: desc
-        ? `${name}. ${asSentence(desc)}`
-        : `${name} helps people buy and sell property locally, from the first appraisal through to settlement.`,
+      aboutText: `${desc ? asSentence(desc) + " " : ""}${name} helps people buy and sell property locally, from the first appraisal through to settlement.`,
       servicesHeading: "What I Do",
       services: [
         { title: "Selling your home", desc: "Appraisal, marketing campaign and negotiation, handled from listing through to settlement.", price: "" },
@@ -814,7 +814,7 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
         // Availability is a placeholder the customer fills in — never "24/7".
         availability: { text: "Same-day call-outs", detail: "[Your hours]" },
         aboutHeading: "Who you're calling",
-        aboutText: `${name}. ${desc ? asSentence(desc) : v.heroLine} Every job starts with a quote, so you know what is being done and what it costs before any work begins.`,
+        aboutText: `${desc ? asSentence(desc) : v.heroLine} Every job at ${name} starts with a quote, so you know what is being done and what it costs before any work begins.`,
         servicesHeading: "What We Do",
         services: v.services.map((s) => ({ title: s.title, desc: s.desc, price: "" })),
         serviceArea: {
@@ -1025,7 +1025,7 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
         approach: {
           eyebrow: "Approach",
           heading: v.approachHeading,
-          text: `${name}. ${desc ? asSentence(desc) : v.heroLine} ${v.approachLine}`
+          text: `${desc ? asSentence(desc) : v.heroLine} ${v.approachLine}`
         },
         // Where I work. Suburbs and travel/notice terms are placeholders; the hours
         // are the customer's own, never "24/7".
