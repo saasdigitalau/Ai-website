@@ -444,7 +444,7 @@ const BUSINESS_TEMPLATES: Record<string, any> = {
   },
   gym: {
     icon: "💪",
-    keywords: ["gym", "fitness", "workout", "crossfit", "training", "coach", "bodybuilding", "yoga", "pilates", "exercise"],
+    keywords: ["gym", "fitness", "workout", "crossfit", "training", "coach", "bodybuilding", "pilates", "exercise"],
     defaultName: "Iron Strength Gym",
     primaryColor: "#dc2626",
     secondaryColor: "#171717",
@@ -1137,7 +1137,22 @@ function initial(name: string): string {
   return m ? m[0].toUpperCase() : "•";
 }
 
+// Google Fonts needs the family on its own, spaces as "+" and weights after a
+// colon: `family=Playfair+Display:wght@400;500;600&display=swap`. Handing it the
+// raw CSS stack ("'Playfair Display', serif") produced an invalid URL that the
+// browser dropped, so every page silently fell back to a system font.
+function googleFontFamilyParam(fontStack: string): string {
+  const family = (fontStack || "")
+    .split(",")[0]
+    .trim()
+    .replace(/['"]/g, "")
+    .trim()
+    .replace(/ /g, "+");
+  return family ? `family=${family}:wght@400;500;600&display=swap` : "";
+}
+
 function generateHtml(data: WebsiteData["metadata"], content: any, lang: string = "en"): string {
+  const bodyFontParam = googleFontFamilyParam(data.fontFamily);
   // A dark-hero template (trades) uses its secondary colour as a dark slate panel,
   // so the contact section is forced onto a light surface — otherwise its
   // text-gray-900 headings would land dark-on-dark.
@@ -1151,7 +1166,7 @@ function generateHtml(data: WebsiteData["metadata"], content: any, lang: string 
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=${data.fontFamily.replace(/[' ]/g, "")}&display=swap');
+    ${bodyFontParam ? `@import url('https://fonts.googleapis.com/css2?${bodyFontParam}');` : ""}
     ${content.headingFontFamily ? `@import url('https://fonts.googleapis.com/css2?family=${content.headingFontFamily.replace(/['"]/g, "").split(",")[0].trim().replace(/ /g, "+")}&display=swap');` : ""}
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: ${data.fontFamily}, sans-serif; }
