@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { formatAccessDate, resolveEntitlement } from "@/lib/entitlements";
 import {
   NOT_CONNECTED_MESSAGE,
   RAZORPAY_CURRENCY,
@@ -78,9 +79,31 @@ export async function POST(req: NextRequest) {
 
   const config = SUBSCRIPTION_TIERS[tier];
 
-  if (user.subscriptionStatus === "active" && user.plan === tier) {
+  // What the account may use right now, not what the plan column says: a
+  // cancelled subscription keeps its plan until the end of the paid month.
+  const entitlement = resolveEntitlement(user);
+
+  if (entitlement.status === "active" && entitlement.plan === tier) {
     return NextResponse.json(
-      { error: `You are already subscribed to the ${config.name} plan.`, tier, plan: user.plan },
+      { error: `You are already subscribed to the ${config.name} plan.`, tier, plan: entitlement.plan },
+      { status: 409 }
+    );
+  }
+
+  if (entitlement.cancelled && entitlement.plan === tier) {
+    // Still inside a paid month they have cancelled: starting another
+    // subscription now would charge them twice for the same period.
+    const until = entitlement.accessUntil ? formatAccessDate(entitlement.accessUntil) : null;
+    return NextResponse.json(
+      {
+        error: until
+          ? `Your ${config.name} plan is cancelled and stays active until ${until}. You can start a new subscription after that.`
+          : `Your ${config.name} plan is cancelled. You can start a new subscription once it ends.`,
+        tier,
+        plan: entitlement.plan,
+        cancelled: true,
+        accessUntil: entitlement.accessUntil?.toISOString() ?? null,
+      },
       { status: 409 }
     );
   }

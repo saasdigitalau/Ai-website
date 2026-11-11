@@ -26,6 +26,10 @@ import {
 //  * Site credits are granted in the same place and the same update as the plan
 //    (SUBSCRIPTION_CREDITS below): one paid month sets the balance to that
 //    tier's allowance, keyed on the paid period so a Razorpay retry grants once.
+//  * A cancellation does not drop the plan: it records subscriptionStatus
+//    "cancelled" and the paid-through date in User.subscriptionEndsAt, and the
+//    account keeps the plan it paid for until that date. The downgrade to free
+//    is a read-time decision in lib/entitlements.ts, never a scheduled write.
 //  * No keys → every caller gets a typed "not connected" error; nothing here
 //    throws at module load.
 // ---------------------------------------------------------------------------
@@ -241,6 +245,8 @@ export type SubscriptionEventResult = {
   userId?: string;
   tier?: SubscriptionTier | "free";
   status?: string;
+  /** For a cancellation: the paid-through date the plan stays in force until. */
+  accessUntil?: string;
   /** True only when this delivery wrote the tier's site credits to the account. */
   creditsGranted?: boolean;
   /** The account's site-credit balance after this delivery. */
@@ -299,19 +305,42 @@ export async function applySubscriptionEvent(
   };
 
   if (event.event === "subscription.cancelled") {
-    // No scheduler exists to defer a downgrade to the end of the paid period,
-    // so cancelling drops the account to free immediately. The end of the paid
-    // period is kept on the row for reference.
+    // Cancelling keeps the plan the customer has already paid for until the end
+    // of that paid period, so `plan` is deliberately NOT written here: the row
+    // records the cancellation and the paid-through date, and the downgrade to
+    // free happens at read time (lib/entitlements.ts) once that date passes. No
+    // scheduler is involved, so no job can fail to fire.
+    //
+    // No credits are granted either — a cancelled subscription is not a paid
+    // month, and the balance the customer already holds is left alone.
+    if (!endsAt) {
+      // Without current_end there is no paid time we can honestly claim, so the
+      // paid-through date is now and the account reads as free immediately.
+      console.warn(
+        `Razorpay webhook: subscription ${entity.id} was cancelled with no current_end; ` +
+          `recording the cancellation as effective now`
+      );
+    }
+    const paidThrough = endsAt ?? new Date();
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
         ...shared,
-        plan: "free",
         subscriptionStatus: "cancelled",
-        ...(endsAt ? { subscriptionEndsAt: endsAt } : {}),
+        subscriptionEndsAt: paidThrough,
       },
     });
-    return { handled: true, userId: user.id, tier: "free", status: "cancelled" };
+
+    return {
+      handled: true,
+      userId: user.id,
+      tier: isSubscriptionTier(user.plan) ? user.plan : "free",
+      status: "cancelled",
+      accessUntil: paidThrough.toISOString(),
+      creditsGranted: false,
+      siteCredits: user.aiCredits,
+    };
   }
 
   // subscription.activated / subscription.charged: only a live subscription

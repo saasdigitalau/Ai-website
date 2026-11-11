@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Globe, Search, FileText, TrendingUp, Plus, AlertTriangle } from "lucide-react";
+import { describeCancellation, resolveEntitlement } from "@/lib/entitlements";
 
 async function getDbUser(userId: string) {
   try {
@@ -25,6 +26,10 @@ export default async function DashboardPage() {
 
   const dbUser = await getDbUser(user.id);
   const dbError = dbUser === null;
+  // What the account may use right now: a cancelled subscription keeps its plan
+  // until the end of the month already paid for.
+  const entitlement = resolveEntitlement(dbUser);
+  const cancellationNote = describeCancellation(entitlement);
 
   const stats = [
     {
@@ -161,21 +166,30 @@ export default async function DashboardPage() {
             <div>
               <div className="text-sm text-gray-500">Current Plan</div>
               <div className="text-xl font-extrabold text-gray-900 capitalize">
-                {dbUser?.plan || "Free"}
+                {entitlement.plan}
               </div>
             </div>
             <Link
               href="/#pricing"
               className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-600"
             >
-              {dbUser?.plan === "free" ? "Upgrade" : "Manage"}
+              {entitlement.plan === "free" ? "Upgrade" : "Manage"}
             </Link>
           </div>
-          <div className="text-xs text-gray-400">
-            {dbUser?.plan === "free"
-              ? "Upgrade to unlock site credits, lead searches, and more."
-              : "You're on a paid plan. Manage your subscription anytime."}
-          </div>
+          {cancellationNote ? (
+            <div className="text-xs text-amber-600">
+              {cancellationNote}
+              {entitlement.accessEnded
+                ? " Your site credits are unchanged."
+                : " You keep every feature of the plan until then; site credits are not added again."}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">
+              {entitlement.plan === "free"
+                ? "Upgrade to unlock site credits, lead searches, and more."
+                : "You're on a paid plan. Manage your subscription anytime."}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -25,6 +25,9 @@ import { applySubscriptionEvent, isSubscriptionEvent } from "@/lib/razorpay-subs
 //    (activated / charged) also sets the account's site credits to that tier's
 //    allowance, once per paid period, in the same update — this webhook is the
 //    only place credits are granted, and a cancelled subscription grants none.
+//    A cancellation does NOT clear the plan: it records "cancelled" plus the
+//    paid-through date, and the account keeps the plan until that date (the
+//    downgrade to free is read-time, see lib/entitlements.ts).
 //  * anything else verified → acknowledged with handled:false, nothing written.
 //
 // No secret configured → 503 not_connected (an explicit state, not a crash).
