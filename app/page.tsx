@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import {
   CardPaymentsNotConnected,
-  SubscriptionPending,
-  useSubscriptionCheckout,
-  type SubscriptionTier,
+  PaymentPending,
+  usePlanCheckout,
+  type PlanTier,
 } from "@/components/subscription-checkout";
 
 export default function Home() {
@@ -13,10 +13,10 @@ export default function Home() {
   const [generatedSite, setGeneratedSite] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-  // Plan buttons start a real Razorpay checkout; the plan itself is only ever
-  // granted by the signature-verified webhook, never from this page.
+  // Plan buttons start a real Razorpay checkout for one month; the plan itself
+  // is only ever granted by the signature-verified webhook, never from this page.
   const { startCheckout, startingTier, cardPaymentsConnected, awaitingConfirmation } =
-    useSubscriptionCheckout();
+    usePlanCheckout();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -298,14 +298,14 @@ export default function Home() {
           <div className="text-center mb-10">
             <p className="text-sm font-semibold uppercase tracking-wider text-indigo-600">Pricing</p>
             <h2 className="mt-3 font-heading text-4xl font-extrabold text-gray-900">Choose Your <span className="text-gradient">Plan</span></h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-gray-500">Prices are in AUD per month. Your plan changes only after a card payment is confirmed by our payment provider — nothing is charged until you complete checkout. Search quotas are not enforced yet, so for now lead searches are fair use.</p>
+            <p className="mx-auto mt-3 max-w-xl text-sm text-gray-500">Prices are in AUD. A plan is bought one month at a time by card and nothing renews on its own — buy another month when the one you paid for ends. Your plan switches on only after a card payment is confirmed by our payment provider, and nothing is charged until you complete checkout. Search quotas are not enforced yet, so for now lead searches are fair use.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {([
               { tier: "starter", name: "Starter", price: "A$25", features: ["Instant site generation", "100 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false },
               { tier: "pro", name: "Pro", price: "A$50", features: ["Instant site generation", "200 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: true },
               { tier: "business", name: "Business", price: "A$100", features: ["Instant site generation", "500 site credits / month", "Lead gen — fair use", "Up to 20 results per search", "Invoicing (create & track)"], popular: false }
-            ] as { tier: SubscriptionTier; name: string; price: string; features: string[]; popular: boolean }[]).map((plan) => (
+            ] as { tier: PlanTier; name: string; price: string; features: string[]; popular: boolean }[]).map((plan) => (
               <div key={plan.name} className={`relative rounded-3xl p-8 transition-all ${
                 plan.popular 
                   ? "bg-gradient-to-b from-indigo-500 to-purple-700 text-white shadow-2xl shadow-indigo-500/25 scale-105"
@@ -346,7 +346,7 @@ export default function Home() {
                 ))}
                 </div>
                 {cardPaymentsConnected === false && <CardPaymentsNotConnected className="mt-8 max-w-4xl mx-auto" />}
-                {awaitingConfirmation && <SubscriptionPending className="mt-8 max-w-4xl mx-auto" />}
+                {awaitingConfirmation && <PaymentPending className="mt-8 max-w-4xl mx-auto" />}
                 </div>
                 </section>
 

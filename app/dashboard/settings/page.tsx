@@ -5,6 +5,7 @@ import { UserButton } from "@clerk/nextjs";
 import WhiteLabelSettings from "@/components/white-label-settings";
 import PlanUpgrade from "@/components/plan-upgrade";
 import { describeCancellation, resolveEntitlement } from "@/lib/entitlements";
+import { isPlanTier } from "@/lib/razorpay-plans";
 
 export default async function SettingsPage() {
   const user = await currentUser();
@@ -14,10 +15,21 @@ export default async function SettingsPage() {
     where: { clerkId: user.id },
   });
 
-  // What the account may use right now: a cancelled subscription keeps its plan
-  // until the end of the month already paid for.
+  // What the account may use right now: a paid month that has run out reads as
+  // free, because nothing renews on its own.
   const entitlement = resolveEntitlement(dbUser);
   const cancellationNote = describeCancellation(entitlement);
+
+  // The last plan this account actually paid for, so the same plan can offer
+  // "buy another month" once its month has ended.
+  const lastPurchase = dbUser
+    ? await prisma.planPurchase.findFirst({
+        where: { userId: dbUser.id, grantedAt: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { tier: true },
+      })
+    : null;
+  const lastTier = isPlanTier(lastPurchase?.tier) ? lastPurchase.tier : null;
 
   return (
     <div>
@@ -60,7 +72,11 @@ export default async function SettingsPage() {
           {cancellationNote && (
             <p className="mb-4 text-xs text-amber-600">{cancellationNote}</p>
           )}
-          <PlanUpgrade currentPlan={entitlement.plan} />
+          <PlanUpgrade
+            currentPlan={entitlement.plan}
+            planEndsAt={entitlement.accessUntil?.toISOString() ?? null}
+            lastTier={lastTier}
+          />
           <div className="mt-4 text-xs text-gray-400">
             Site Credits: {dbUser?.aiCredits ?? 0}
           </div>

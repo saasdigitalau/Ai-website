@@ -1,25 +1,28 @@
 "use client";
 
 // ---------------------------------------------------------------------------
-// Shared Razorpay Checkout wiring for the three AUD subscription tiers.
+// Shared Razorpay Checkout wiring for the three AUD plans.
 //
-//  * The plan buttons POST { tier } to /api/subscription/razorpay, which creates
-//    the Razorpay subscription and hands back the public key id + subscription
-//    id. Nothing here ever sets the user's plan: the plan is granted only by the
+//  * Plans are bought one month at a time (owner decision, Nov 16: nothing
+//    auto-renews). The plan buttons POST { tier } to
+//    /api/subscription/razorpay, which creates a one-time Razorpay order for
+//    that month in AUD and hands back the public key id + order id + amount.
+//    Razorpay Checkout opens on that order.
+//  * Nothing here ever sets the user's plan: the month is granted only by the
 //    signature-verified webhook in app/api/webhook/razorpay/route.ts, so the UI
 //    shows a "being confirmed" state after Checkout completes.
 //  * With no Razorpay keys the route answers 503 / connected:false and the UI
 //    shows the "Card payments are not connected yet" panel instead of a checkout.
 //  * Anonymous visitors get 401 and are sent to sign-up — checkout needs an
-//    account to attach the subscription to.
+//    account to attach the month to.
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
 import toast from "react-hot-toast";
 
-export type SubscriptionTier = "starter" | "pro" | "business";
+export type PlanTier = "starter" | "pro" | "business";
 
-export const SUBSCRIPTION_TIER_BUTTONS: { tier: SubscriptionTier; name: string; price: string }[] = [
+export const PLAN_TIER_BUTTONS: { tier: PlanTier; name: string; price: string }[] = [
   { tier: "starter", name: "Starter", price: "A$25" },
   { tier: "pro", name: "Pro", price: "A$50" },
   { tier: "business", name: "Business", price: "A$100" },
@@ -33,12 +36,6 @@ interface RazorpayCheckoutInstance {
 type RazorpayConstructor = new (options: Record<string, unknown>) => RazorpayCheckoutInstance;
 
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
-
-// Shown only if the route answers without its own message. Same wording as
-// SUBSCRIPTIONS_UNAVAILABLE_MESSAGE in lib/razorpay.ts, which cannot be imported
-// here: that module uses node:crypto and must stay on the server.
-const SUBSCRIPTIONS_UNAVAILABLE_FALLBACK =
-  "Monthly card subscriptions are not available yet — the payment provider does not support AUD subscriptions. Paying a client invoice by card does work today. Nothing has been charged, and your plan stays as it is.";
 
 function loadRazorpayCheckout(): Promise<RazorpayConstructor> {
   return new Promise((resolve, reject) => {
@@ -58,21 +55,16 @@ function loadRazorpayCheckout(): Promise<RazorpayConstructor> {
   });
 }
 
-export function useSubscriptionCheckout() {
-  const [startingTier, setStartingTier] = useState<SubscriptionTier | null>(null);
+export function usePlanCheckout() {
+  const [startingTier, setStartingTier] = useState<PlanTier | null>(null);
   // null = not asked yet, false = provider not connected, true = checkout works.
   const [cardPaymentsConnected, setCardPaymentsConnected] = useState<boolean | null>(null);
   // Set once Razorpay Checkout reports a completed payment. The plan is NOT
-  // changed here — only the signature-verified webhook grants it.
-  const [awaitingConfirmation, setAwaitingConfirmation] = useState<SubscriptionTier | null>(null);
-  // Set when the route reports that monthly card subscriptions cannot start
-  // yet (the provider refuses AUD plans). Card payment on an invoice still
-  // works, so this is a plain notice, not a "not connected" or error state.
-  const [subscriptionsUnavailable, setSubscriptionsUnavailable] = useState<string | null>(null);
+  // changed here — only the signature-verified webhook grants the month.
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState<PlanTier | null>(null);
 
-  const startCheckout = async (tier: SubscriptionTier) => {
+  const startCheckout = async (tier: PlanTier) => {
     setStartingTier(tier);
-    setSubscriptionsUnavailable(null);
     try {
       const res = await fetch("/api/subscription/razorpay", {
         method: "POST",
@@ -82,7 +74,7 @@ export function useSubscriptionCheckout() {
       const data = await res.json().catch(() => ({}));
 
       if (res.status === 401) {
-        // Checkout needs an account to attach the subscription to.
+        // Checkout needs an account to attach the month to.
         window.location.assign("/sign-up");
         return;
       }
@@ -92,16 +84,11 @@ export function useSubscriptionCheckout() {
         return;
       }
 
-      // The provider cannot start an AUD subscription plan yet. Say so plainly
-      // rather than showing its raw error — invoice card payment does work.
-      if (data?.subscriptionsAvailable === false) {
-        setCardPaymentsConnected(true);
-        setSubscriptionsUnavailable(data?.error || SUBSCRIPTIONS_UNAVAILABLE_FALLBACK);
-        return;
-      }
-
       if (!res.ok) {
-        toast.error(data?.error || "Could not start the subscription");
+        // Includes 409: this month is already paid for, so there is nothing to
+        // charge for yet. The route's message says until when.
+        setCardPaymentsConnected(true);
+        toast.error(data?.error || "Could not start the card payment");
         return;
       }
 
@@ -110,18 +97,22 @@ export function useSubscriptionCheckout() {
       const Razorpay = await loadRazorpayCheckout();
       const checkout = new Razorpay({
         key: data.keyId,
-        subscription_id: data.subscriptionId,
+        // A one-time order for one month: no subscription id, so nothing can
+        // renew on its own.
+        order_id: data.orderId,
+        amount: data.amount,
+        currency: data.currency || "AUD",
         name: "SiteLaunch AI",
-        description: data.description || `${data.name || tier} plan — monthly`,
+        description: data.description || `${data.name || tier} — one month`,
         prefill: data.prefill || {},
         theme: { color: "#6366f1" },
         handler: () => {
-          // Razorpay has the payment; the plan is granted by the webhook only.
+          // Razorpay has the payment; the month is granted by the webhook only.
           setAwaitingConfirmation(tier);
-          toast.success("Payment submitted — your plan updates once it is confirmed");
+          toast.success("Payment submitted — your plan switches on once it is confirmed");
         },
         modal: {
-          ondismiss: () => toast("Subscription checkout closed", { icon: "ℹ️" }),
+          ondismiss: () => toast("Card checkout closed — nothing has been charged", { icon: "ℹ️" }),
         },
       });
       checkout.on("payment.failed", () => {
@@ -141,23 +132,7 @@ export function useSubscriptionCheckout() {
     cardPaymentsConnected,
     setCardPaymentsConnected,
     awaitingConfirmation,
-    subscriptionsUnavailable,
   };
-}
-
-export function SubscriptionsUnavailable({
-  message,
-  className = "",
-}: {
-  message: string;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 ${className}`}>
-      <div className="text-sm font-bold text-gray-900">Monthly card plans are not available yet</div>
-      <p className="text-sm text-gray-700 mt-1">{message}</p>
-    </div>
-  );
 }
 
 export function CardPaymentsNotConnected({ className = "" }: { className?: string }) {
@@ -172,12 +147,12 @@ export function CardPaymentsNotConnected({ className = "" }: { className?: strin
   );
 }
 
-export function SubscriptionPending({ className = "" }: { className?: string }) {
+export function PaymentPending({ className = "" }: { className?: string }) {
   return (
     <div className={`rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 ${className}`}>
       <div className="text-sm font-bold text-blue-900">Payment submitted — being confirmed</div>
       <p className="text-sm text-blue-800 mt-1">
-        The payment provider has your payment. Your plan changes once it is confirmed, which
+        The payment provider has your payment. Your plan switches on once it is confirmed, which
         usually takes a moment. It has not changed yet.
       </p>
     </div>

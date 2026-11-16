@@ -6,29 +6,28 @@ import {
   RAZORPAY_CURRENCY,
   RazorpayNotConnectedError,
   RazorpayRequestError,
-  SUBSCRIPTIONS_UNAVAILABLE_MESSAGE,
   isCurrencyUnsupportedError,
   isRazorpayConfigured,
   razorpayKeyId,
 } from "@/lib/razorpay";
 import {
-  SUBSCRIPTION_TIERS,
-  SUBSCRIPTION_TIER_LIST,
-  isSubscriptionTier,
-  startSubscriptionForUser,
-} from "@/lib/razorpay-subscriptions";
+  PLAN_TIERS,
+  PLAN_TIER_LIST,
+  isPlanTier,
+  startPlanPurchaseForUser,
+} from "@/lib/razorpay-plans";
 
 // ---------------------------------------------------------------------------
-// GET  /api/subscription/razorpay — is subscription billing connected, and what
-//      are the three tiers? Public and honest: with no keys it answers
-//      connected:false and the reason, and never invents a checkout.
+// GET  /api/subscription/razorpay — is card payment connected, and what are the
+//      three plans? Public and honest: with no keys it answers connected:false
+//      and the reason, and never invents a checkout.
 //
 // POST /api/subscription/razorpay — body { tier: "starter" | "pro" | "business" }.
-//      Creates the Razorpay plan for that tier if it does not exist yet, creates
-//      a monthly AUD subscription for the signed-in user, records the
-//      subscription id against the user, and returns the checkout details
-//      (public key id + subscription id). The plan itself is granted only by the
-//      signature-verified webhook, never here.
+//      Creates a one-time Razorpay order for one month of that plan in AUD
+//      (A$25 / A$50 / A$100), records the purchase against the signed-in user,
+//      and returns what Checkout needs (public key id + order id + amount).
+//      Nothing is granted here: the plan and its site credits are granted only
+//      by the signature-verified webhook, once per order id. Nothing renews.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -39,8 +38,9 @@ export async function GET() {
     connected,
     provider: "razorpay",
     currency: RAZORPAY_CURRENCY,
-    period: "monthly",
-    tiers: SUBSCRIPTION_TIER_LIST,
+    // One month per payment, bought again when the month ends.
+    oneTime: true,
+    tiers: PLAN_TIER_LIST,
     error: connected ? undefined : NOT_CONNECTED_MESSAGE,
   });
 }
@@ -69,49 +69,39 @@ export async function POST(req: NextRequest) {
   }
 
   const tier = body?.tier;
-  if (!isSubscriptionTier(tier)) {
+  if (!isPlanTier(tier)) {
     return NextResponse.json(
       {
         error: "Choose a plan: starter, pro or business.",
-        tiers: SUBSCRIPTION_TIER_LIST,
+        tiers: PLAN_TIER_LIST,
       },
       { status: 400 }
     );
   }
 
-  const config = SUBSCRIPTION_TIERS[tier];
+  const config = PLAN_TIERS[tier];
 
-  // What the account may use right now, not what the plan column says: a
-  // cancelled subscription keeps its plan until the end of the paid month.
+  // What the account may use right now, not what the plan column says: the paid
+  // month runs out on its own and the account reads as free after that.
   const entitlement = resolveEntitlement(user);
 
-  if (entitlement.status === "active" && entitlement.plan === tier) {
-    return NextResponse.json(
-      { error: `You are already subscribed to the ${config.name} plan.`, tier, plan: entitlement.plan },
-      { status: 409 }
-    );
-  }
-
-  if (entitlement.cancelled && entitlement.plan === tier) {
-    // Still inside a paid month they have cancelled: starting another
-    // subscription now would charge them twice for the same period.
-    const until = entitlement.accessUntil ? formatAccessDate(entitlement.accessUntil) : null;
+  if (entitlement.plan === tier && entitlement.accessUntil) {
+    // The month they already paid for is still running, so a second order for
+    // the same plan would charge twice for the same days.
+    const until = formatAccessDate(entitlement.accessUntil);
     return NextResponse.json(
       {
-        error: until
-          ? `Your ${config.name} plan is cancelled and stays active until ${until}. You can start a new subscription after that.`
-          : `Your ${config.name} plan is cancelled. You can start a new subscription once it ends.`,
+        error: `Your ${config.name} plan is paid until ${until}. You can buy another month after that.`,
         tier,
         plan: entitlement.plan,
-        cancelled: true,
-        accessUntil: entitlement.accessUntil?.toISOString() ?? null,
+        accessUntil: entitlement.accessUntil.toISOString(),
       },
       { status: 409 }
     );
   }
 
   try {
-    const { subscription, planId } = await startSubscriptionForUser({
+    const { order, purchaseId } = await startPlanPurchaseForUser({
       userId: user.id,
       clerkId: user.clerkId,
       tier,
@@ -120,20 +110,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       connected: true,
       provider: "razorpay",
+      oneTime: true,
       tier,
       name: config.name,
       amount: config.amount,
-      currency: RAZORPAY_CURRENCY,
-      period: "monthly",
-      interval: 1,
+      currency: order.currency || RAZORPAY_CURRENCY,
       description: config.description,
-      planId,
-      subscriptionId: subscription.id,
-      status: subscription.status,
+      orderId: order.id,
+      purchaseId,
       // The key id is public by design; the secret is never returned.
       keyId: razorpayKeyId(),
-      // Razorpay's hosted subscription page, when it returns one.
-      shortUrl: subscription.short_url ?? null,
       prefill: {
         name: user.name ?? undefined,
         email: user.email ?? undefined,
@@ -152,39 +138,33 @@ export async function POST(req: NextRequest) {
       );
     }
     if (isCurrencyUnsupportedError(err)) {
-      // Razorpay takes card payments on an AUD invoice, but refuses an AUD
-      // *plan* ("Currency provided is not supported"), and a subscription is
-      // built from a plan. That is the provider's limitation, not the caller's
-      // mistake, so answer it plainly instead of relaying the raw error.
-      console.warn(
-        "Razorpay does not support AUD plans; monthly card subscriptions cannot start yet."
-      );
+      // An AUD order is the one thing Razorpay takes happily in our currency, so
+      // this should never happen; if it ever does, say it plainly.
+      console.warn("Razorpay refused an AUD order:", err.message);
       return NextResponse.json(
         {
           connected: true,
           provider: "razorpay",
           currency: RAZORPAY_CURRENCY,
           tier,
-          // The UI shows this as a plain notice, not as a provider error.
-          subscriptionsAvailable: false,
-          error: SUBSCRIPTIONS_UNAVAILABLE_MESSAGE,
+          error: "The payment provider would not take an AUD card order. Nothing has been charged, and your plan stays as it is.",
         },
         { status: 422 }
       );
     }
     if (err instanceof RazorpayRequestError) {
-      console.error("Razorpay subscription failed:", err.message);
+      console.error("Razorpay plan order failed:", err.message);
       return NextResponse.json(
         { connected: true, provider: "razorpay", error: err.message },
         { status: err.status >= 400 && err.status < 600 ? err.status : 502 }
       );
     }
-    console.error("Error creating Razorpay subscription:", err);
+    console.error("Error creating Razorpay plan order:", err);
     return NextResponse.json(
       {
         connected: true,
         provider: "razorpay",
-        error: "Could not start a subscription. Nothing has been charged.",
+        error: "Could not start the card payment. Nothing has been charged.",
       },
       { status: 500 }
     );
