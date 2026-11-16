@@ -34,6 +34,12 @@ type RazorpayConstructor = new (options: Record<string, unknown>) => RazorpayChe
 
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 
+// Shown only if the route answers without its own message. Same wording as
+// SUBSCRIPTIONS_UNAVAILABLE_MESSAGE in lib/razorpay.ts, which cannot be imported
+// here: that module uses node:crypto and must stay on the server.
+const SUBSCRIPTIONS_UNAVAILABLE_FALLBACK =
+  "Monthly card subscriptions are not available yet — the payment provider does not support AUD subscriptions. Paying a client invoice by card does work today. Nothing has been charged, and your plan stays as it is.";
+
 function loadRazorpayCheckout(): Promise<RazorpayConstructor> {
   return new Promise((resolve, reject) => {
     const existing = (window as unknown as { Razorpay?: RazorpayConstructor }).Razorpay;
@@ -59,9 +65,14 @@ export function useSubscriptionCheckout() {
   // Set once Razorpay Checkout reports a completed payment. The plan is NOT
   // changed here — only the signature-verified webhook grants it.
   const [awaitingConfirmation, setAwaitingConfirmation] = useState<SubscriptionTier | null>(null);
+  // Set when the route reports that monthly card subscriptions cannot start
+  // yet (the provider refuses AUD plans). Card payment on an invoice still
+  // works, so this is a plain notice, not a "not connected" or error state.
+  const [subscriptionsUnavailable, setSubscriptionsUnavailable] = useState<string | null>(null);
 
   const startCheckout = async (tier: SubscriptionTier) => {
     setStartingTier(tier);
+    setSubscriptionsUnavailable(null);
     try {
       const res = await fetch("/api/subscription/razorpay", {
         method: "POST",
@@ -78,6 +89,14 @@ export function useSubscriptionCheckout() {
 
       if (res.status === 503 || data?.connected === false) {
         setCardPaymentsConnected(false);
+        return;
+      }
+
+      // The provider cannot start an AUD subscription plan yet. Say so plainly
+      // rather than showing its raw error — invoice card payment does work.
+      if (data?.subscriptionsAvailable === false) {
+        setCardPaymentsConnected(true);
+        setSubscriptionsUnavailable(data?.error || SUBSCRIPTIONS_UNAVAILABLE_FALLBACK);
         return;
       }
 
@@ -122,7 +141,23 @@ export function useSubscriptionCheckout() {
     cardPaymentsConnected,
     setCardPaymentsConnected,
     awaitingConfirmation,
+    subscriptionsUnavailable,
   };
+}
+
+export function SubscriptionsUnavailable({
+  message,
+  className = "",
+}: {
+  message: string;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 ${className}`}>
+      <div className="text-sm font-bold text-gray-900">Monthly card plans are not available yet</div>
+      <p className="text-sm text-gray-700 mt-1">{message}</p>
+    </div>
+  );
 }
 
 export function CardPaymentsNotConnected({ className = "" }: { className?: string }) {

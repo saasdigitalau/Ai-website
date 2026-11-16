@@ -47,11 +47,45 @@ export class RazorpayNotConnectedError extends Error {
 export class RazorpayRequestError extends Error {
   code = "razorpay_error" as const;
   status: number;
-  constructor(message: string, status: number) {
+  /** Razorpay's own error code / description / field, when it sent them. */
+  providerCode?: string;
+  providerDescription?: string;
+  providerField?: string;
+  constructor(
+    message: string,
+    status: number,
+    provider?: { code?: string; description?: string; field?: string }
+  ) {
     super(message);
     this.name = "RazorpayRequestError";
     this.status = status;
+    this.providerCode = provider?.code;
+    this.providerDescription = provider?.description;
+    this.providerField = provider?.field;
   }
+}
+
+/**
+ * Plain message for the provider limitation we cannot fix in code: Razorpay
+ * refuses *plans* in AUD (and USD) — POST /v1/plans answers 400 "Currency
+ * provided is not supported" — so monthly card subscriptions cannot start,
+ * while a card payment on a single invoice in AUD does work. Saying that is
+ * more useful (and more honest) than relaying the raw provider error.
+ */
+export const SUBSCRIPTIONS_UNAVAILABLE_MESSAGE =
+  "Monthly card subscriptions are not available yet — the payment provider does not support AUD subscriptions. Paying a client invoice by card does work today. Nothing has been charged, and your plan stays as it is.";
+
+/**
+ * True when the provider rejected the request because of the currency. Razorpay
+ * answers a plan in AUD/USD with field "currency" and "Currency provided is not
+ * supported"; the message text is checked too, so a reworded description still
+ * lands on the plain answer rather than a raw provider string.
+ */
+export function isCurrencyUnsupportedError(err: unknown): boolean {
+  if (!(err instanceof RazorpayRequestError)) return false;
+  if (err.providerField === "currency") return true;
+  const text = `${err.providerDescription ?? ""} ${err.message}`;
+  return /currency[^.]{0,40}not supported/i.test(text);
 }
 
 // Env is read at call time, not at module load, so a restarted deployment picks
@@ -120,7 +154,12 @@ async function razorpayPost(url: string, body: unknown, what: string): Promise<a
       data?.error?.description || data?.error?.reason || text?.slice(0, 200) || "no response body";
     throw new RazorpayRequestError(
       `Razorpay refused the ${what} (${res.status}): ${detail}`,
-      res.status >= 400 && res.status < 500 ? 502 : res.status
+      res.status >= 400 && res.status < 500 ? 502 : res.status,
+      {
+        code: data?.error?.code,
+        description: data?.error?.description || data?.error?.reason,
+        field: data?.error?.field,
+      }
     );
   }
 

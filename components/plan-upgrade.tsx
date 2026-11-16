@@ -3,6 +3,7 @@
 import {
   CardPaymentsNotConnected,
   SUBSCRIPTION_TIER_BUTTONS,
+  SubscriptionsUnavailable,
   SubscriptionPending,
   useSubscriptionCheckout,
 } from "@/components/subscription-checkout";
@@ -10,8 +11,13 @@ import {
 // The settings "Upgrade" control: one button per tier, each starting a real
 // Razorpay checkout. Nothing here sets the plan — the webhook does.
 export default function PlanUpgrade({ currentPlan }: { currentPlan: string }) {
-  const { startCheckout, startingTier, cardPaymentsConnected, awaitingConfirmation } =
-    useSubscriptionCheckout();
+  const {
+    startCheckout,
+    startingTier,
+    cardPaymentsConnected,
+    awaitingConfirmation,
+    subscriptionsUnavailable,
+  } = useSubscriptionCheckout();
 
   return (
     <div>
@@ -42,6 +48,9 @@ export default function PlanUpgrade({ currentPlan }: { currentPlan: string }) {
       </p>
 
       {cardPaymentsConnected === false && <CardPaymentsNotConnected className="mt-4" />}
+      {subscriptionsUnavailable && (
+        <SubscriptionsUnavailable message={subscriptionsUnavailable} className="mt-4" />
+      )}
       {awaitingConfirmation && <SubscriptionPending className="mt-4" />}
     </div>
   );
