@@ -8,26 +8,25 @@ import {
   verifyWebhookSignature,
   type RazorpayWebhookEvent,
 } from "@/lib/razorpay";
-import { applySubscriptionEvent, isSubscriptionEvent } from "@/lib/razorpay-subscriptions";
+import { applyPlanPurchaseEvent } from "@/lib/razorpay-plans";
 
 // ---------------------------------------------------------------------------
 // POST /api/webhook/razorpay — the ONLY place an invoice becomes paid, and the
-// only place a subscription grants a plan.
+// only place a plan month is granted.
 //
 // The raw request body is verified against the x-razorpay-signature header with
 // RAZORPAY_WEBHOOK_SECRET before anything is read from it. Then:
 //
-//  * payment.captured / order.paid → match the invoice whose razorpayOrderId
-//    equals the payment's order_id, require the amount and AUD currency to
-//    match, and flip it to paid.
-//  * subscription.activated / subscription.charged / subscription.cancelled →
-//    update the owning user's plan and subscriptionStatus. A paid month
-//    (activated / charged) also sets the account's site credits to that tier's
-//    allowance, once per paid period, in the same update — this webhook is the
-//    only place credits are granted, and a cancelled subscription grants none.
-//    A cancellation does NOT clear the plan: it records "cancelled" plus the
-//    paid-through date, and the account keeps the plan until that date (the
-//    downgrade to free is read-time, see lib/entitlements.ts).
+//  * payment.captured / order.paid on a plan order → the PlanPurchase recorded
+//    at checkout is found by order id, the amount and AUD currency must match
+//    the price, and the plan is granted for one month: User.plan, an "active"
+//    status, the paid-through date (payment date + one month) and the tier's
+//    site credits (set, never added) in one update. The month is claimed once
+//    per order id, so a retried or duplicated delivery changes nothing. Nothing
+//    renews: the next month is a new order.
+//  * payment.captured / order.paid on an invoice order → match the invoice whose
+//    razorpayOrderId equals the payment's order_id, require the amount and AUD
+//    currency to match, and flip it to paid.
 //  * anything else verified → acknowledged with handled:false, nothing written.
 //
 // No secret configured → 503 not_connected (an explicit state, not a crash).
@@ -70,20 +69,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verified subscription lifecycle events: plan changes are written from here
-  // and nowhere else.
-  if (isSubscriptionEvent(event.event)) {
-    const result = await applySubscriptionEvent(event);
-    return NextResponse.json({
-      received: true,
-      event: event.event,
-      ...result,
-    });
-  }
-
   // Verified, but not an event we act on: acknowledge and change nothing.
   if (!isPaidEvent(event.event)) {
     return NextResponse.json({ received: true, event: event.event ?? null, handled: false });
+  }
+
+  // A plan month is bought with its own order, so try that first. "unknown
+  // order" means this payment is not a plan purchase, and the invoice path
+  // below gets its turn.
+  const planResult = await applyPlanPurchaseEvent(event);
+  if (planResult.reason !== "unknown order") {
+    if (planResult.mismatch) {
+      return NextResponse.json(
+        { connected: true, provider: "razorpay", error: planResult.reason },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ received: true, event: event.event, ...planResult });
   }
 
   const payment = event.payload?.payment?.entity;

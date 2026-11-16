@@ -1,20 +1,20 @@
 // ---------------------------------------------------------------------------
 // Read-time plan entitlement
 //
-// User.plan is what the last signature-verified webhook wrote — the plan the
-// customer pays for. A cancelled subscription keeps that plan until the end of
-// the month already paid for, so "which plan is this account entitled to right
-// now?" is a question answered when the row is read, not a value that has to be
-// rewritten later.
+// Plans are sold one month at a time and nothing renews (owner decision, Nov
+// 16). User.plan is what the last signature-verified webhook granted, and
+// User.subscriptionEndsAt is the last moment of the month that was paid for. So
+// "which plan is this account entitled to right now?" is a question answered
+// when the row is read, not a value that has to be rewritten later: once the
+// paid month has run out the account reads as free, with no scheduler and no
+// job that can fail to fire. Buying another month is a new order, granted by
+// the same webhook.
 //
-// The webhook records the cancellation and the paid-through date
-// (User.subscriptionEndsAt) and leaves User.plan alone; every reader goes
-// through resolveEntitlement() below, which reports "free" once that date has
-// passed. Nothing has to run for the downgrade to happen, and no scheduled job
-// can fail to fire.
+// A cancelled subscription (the older monthly-subscription flow) is treated the
+// same way: the plan it paid for holds until subscriptionEndsAt, then free.
 //
-// Nothing here writes anything, and nothing here grants credits: cancelling a
-// subscription never changes a credit balance.
+// Nothing here writes anything, and nothing here grants credits: letting a paid
+// month end never changes a credit balance.
 // ---------------------------------------------------------------------------
 
 export type EntitlementSource = {
@@ -34,18 +34,24 @@ export type Entitlement = {
   cancelled: boolean;
   /** Last moment of the paid period, when one is recorded. */
   accessUntil: Date | null;
-  /** True when a cancelled subscription's paid period has run out. */
+  /** True when the paid period has run out (or a cancellation ended it). */
   accessEnded: boolean;
+  /** True when the paid month has run out and no renewal is coming. */
+  expired: boolean;
 };
 
 /**
  * Which plan the account may use at `now`.
  *
  *  * No stored plan, or stored plan "free" → free.
- *  * Stored plan paid and not cancelled → that plan.
+ *  * A recorded paid-through date that has passed → free, whatever the status
+ *    says: the month was bought and it is over.
+ *  * Stored plan paid, not cancelled, inside its paid month → that plan.
  *  * Stored plan paid and cancelled → that plan until subscriptionEndsAt, then
  *    free. A cancellation with no paid-through date cannot prove any remaining
  *    paid time, so it reads as free.
+ *  * No paid-through date at all → the stored plan (an older row that predates
+ *    month-by-month billing; there is no expiry we can honestly claim).
  */
 export function resolveEntitlement(
   user: EntitlementSource | null | undefined,
@@ -55,6 +61,7 @@ export function resolveEntitlement(
   const status = user?.subscriptionStatus || "inactive";
   const accessUntil = user?.subscriptionEndsAt ?? null;
   const cancelled = status === "cancelled";
+  const paidPeriodOver = accessUntil !== null && accessUntil.getTime() <= now.getTime();
 
   if (storedPlan === "free") {
     return {
@@ -63,12 +70,26 @@ export function resolveEntitlement(
       status,
       cancelled,
       accessUntil,
-      accessEnded: cancelled,
+      accessEnded: cancelled || paidPeriodOver,
+      expired: paidPeriodOver,
+    };
+  }
+
+  if (paidPeriodOver) {
+    return {
+      plan: "free",
+      storedPlan,
+      status,
+      cancelled,
+      accessUntil,
+      accessEnded: true,
+      expired: true,
     };
   }
 
   if (cancelled) {
-    const stillPaid = accessUntil !== null && accessUntil.getTime() > now.getTime();
+    // Cancelled with no paid-through date: no remaining paid time to claim.
+    const stillPaid = accessUntil !== null;
     return {
       plan: stillPaid ? storedPlan : "free",
       storedPlan,
@@ -76,6 +97,7 @@ export function resolveEntitlement(
       cancelled: true,
       accessUntil,
       accessEnded: !stillPaid,
+      expired: false,
     };
   }
 
@@ -86,6 +108,7 @@ export function resolveEntitlement(
     cancelled: false,
     accessUntil,
     accessEnded: false,
+    expired: false,
   };
 }
 

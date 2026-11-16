@@ -187,7 +187,9 @@ export default async function DashboardPage() {
             <div className="text-xs text-gray-400">
               {entitlement.plan === "free"
                 ? "Upgrade to unlock site credits, lead searches, and more."
-                : "You're on a paid plan. Manage your subscription anytime."}
+                : entitlement.accessUntil
+                  ? `You're on a paid plan, paid until ${entitlement.accessUntil.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}. Nothing renews on its own.`
+                  : "You're on a paid plan. Nothing renews on its own."}
             </div>
           )}
         </div>

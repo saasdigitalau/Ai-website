@@ -16,9 +16,11 @@ model User {
   stripeCustomerId String?
   stripeSubscriptionId String?
   subscriptionStatus String? // active, past_due, canceled, etc.
-  // Razorpay subscriptions (AUD, monthly). The subscription id is recorded at
-  // checkout so the signature-verified webhook can find the user; plan and
-  // subscriptionStatus are written only by that webhook.
+  // Razorpay one-time plan purchases (AUD, one month at a time). The purchase
+  // row is recorded at checkout so the signature-verified webhook can grant it;
+  // plan, subscriptionStatus and subscriptionEndsAt are written only by that
+  // webhook, and subscriptionEndsAt is the paid-through date the read-time
+  // entitlement (lib/entitlements.ts) falls back to free on. Nothing renews.
   razorpayCustomerId     String?
   razorpaySubscriptionId String?  @unique
   razorpayPlanId         String?
@@ -34,6 +36,7 @@ model User {
   invoices  Invoice[]
   leads     LeadSearch[]
   clients   Client[]
+  planPurchases PlanPurchase[]
 }
 
 model Website {
@@ -174,15 +177,28 @@ model SocialSnippet {
   website Website @relation(fields: [websiteId], references: [id])
 }
 
-// One Razorpay plan per subscription tier, created through the Plans API the
-// first time a tier is checked out and reused from here afterwards. Set
-// RAZORPAY_PLAN_STARTER / _PRO / _BUSINESS to skip creation entirely.
-model RazorpayPlan {
-  tier      String   @id // starter, pro, business
-  planId    String   @unique
-  amount    Int      // cents, AUD
-  currency  String   @default("AUD")
-  period    String   @default("monthly")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// One month of a paid plan, bought as a one-time AUD card order (owner
+// decision, Nov 16: no auto-renewal). The row is written when the order is
+// created and granted only by the signature-verified webhook, which claims it
+// once — grantedAt is the claim, keyed on the unique order id — so a retried or
+// duplicated delivery cannot grant the same month twice, and a second month is
+// always a second order.
+model PlanPurchase {
+  id                String    @id @default(cuid())
+  userId            String
+  tier              String // starter, pro, business
+  amount            Int // cents, AUD
+  currency          String    @default("AUD")
+  razorpayOrderId   String    @unique
+  razorpayPaymentId String?
+  status            String    @default("created") // created, paid
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  grantedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
 }
