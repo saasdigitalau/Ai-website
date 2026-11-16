@@ -6,6 +6,8 @@ import {
   RAZORPAY_CURRENCY,
   RazorpayNotConnectedError,
   RazorpayRequestError,
+  SUBSCRIPTIONS_UNAVAILABLE_MESSAGE,
+  isCurrencyUnsupportedError,
   isRazorpayConfigured,
   razorpayKeyId,
 } from "@/lib/razorpay";
@@ -147,6 +149,27 @@ export async function POST(req: NextRequest) {
           error: NOT_CONNECTED_MESSAGE,
         },
         { status: 503 }
+      );
+    }
+    if (isCurrencyUnsupportedError(err)) {
+      // Razorpay takes card payments on an AUD invoice, but refuses an AUD
+      // *plan* ("Currency provided is not supported"), and a subscription is
+      // built from a plan. That is the provider's limitation, not the caller's
+      // mistake, so answer it plainly instead of relaying the raw error.
+      console.warn(
+        "Razorpay does not support AUD plans; monthly card subscriptions cannot start yet."
+      );
+      return NextResponse.json(
+        {
+          connected: true,
+          provider: "razorpay",
+          currency: RAZORPAY_CURRENCY,
+          tier,
+          // The UI shows this as a plain notice, not as a provider error.
+          subscriptionsAvailable: false,
+          error: SUBSCRIPTIONS_UNAVAILABLE_MESSAGE,
+        },
+        { status: 422 }
       );
     }
     if (err instanceof RazorpayRequestError) {
