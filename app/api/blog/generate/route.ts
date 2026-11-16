@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 import { resolveEntitlement } from "@/lib/entitlements";
 
 const BUSINESS_BLOG_PROMPTS: Record<string, { topics: string[]; tone: string; angle: string }> = {
@@ -102,9 +103,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "websiteId is required" }, { status: 400 });
     }
 
-    const dbUser = await prisma.user.findUnique({ where: { clerkId: userId } });
+    const dbUser = await getCurrentUser();
     if (!dbUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const website = await prisma.website.findUnique({

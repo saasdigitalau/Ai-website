@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 
 // GET /api/invoices — list invoices for current user
@@ -73,8 +74,8 @@ export async function POST(req: NextRequest) {
     }
     const invoiceNumber = `INV-${String(nextNum).padStart(4, "0")}`;
 
-    const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const invoice = await prisma.invoice.create({
       data: {
