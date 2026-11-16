@@ -130,14 +130,19 @@ export default function ClientPortalPage() {
     }
   }
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString("en-US", {
+  const formatDate = (d: string) => new Date(d).toLocaleDateString("en-AU", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 
+  // en-AU + AUD through Intl renders a bare "$1,300.00", which reads as US
+  // dollars to a client, so the A$ prefix is explicit. Amounts are in AUD.
   const formatPrice = (cents: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+    `A$${(cents / 100).toLocaleString("en-AU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
 
   const statusColors: Record<string, string> = {
     paid: "bg-green-100 text-green-800",

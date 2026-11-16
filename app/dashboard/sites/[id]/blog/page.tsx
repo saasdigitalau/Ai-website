@@ -135,7 +135,7 @@ export default function BlogDashboard() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-US", {
+    return new Date(dateStr).toLocaleDateString("en-AU", {
       month: "short", day: "numeric", year: "numeric",
     });
   };

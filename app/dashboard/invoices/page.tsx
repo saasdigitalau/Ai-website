@@ -88,7 +88,7 @@ export default function InvoicesPage() {
   };
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-  const formatDate = (date: string) => new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const formatDate = (date: string) => new Date(date).toLocaleDateString("en-AU", { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <div>
