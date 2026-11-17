@@ -2,25 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { fetchFromOpenStreetMap, LocationNotFoundError, OpenStreetMapError } from "@/lib/lead-finder-osm";
+import type { Lead, LeadSource } from "@/lib/lead-finder-types";
+
+export type { Lead } from "@/lib/lead-finder-types";
 
 // ---------------------------------------------------------------------------
 // Lead Finder API
 //
-// Live results are looked up from the Google Places API (Text Search), behind
-// the GOOGLE_PLACES_API_KEY env var. When that key is not configured we return
-// an explicit "not_configured" response (503) — we never invent businesses,
-// phone numbers, emails, addresses, ratings or review counts.
+// Two live providers, in this order:
+//   1. Google Places (Text Search) — used only when GOOGLE_PLACES_API_KEY is
+//      set. It is billed per request.
+//   2. OpenStreetMap — the default, because it needs no API key and no billing.
+//      The location is geocoded with Nominatim and the businesses come from the
+//      Overpass API. See lib/lead-finder-osm.ts.
 //
-// A real (non-demo) search requires a signed-in Clerk user: Google Places
-// calls are billed per request, so an anonymous caller must never be able to
-// spend our quota. Unauthenticated real searches get 401. Demo mode (demo=1)
-// is the only path that works without a session — it is clearly labelled
-// sample data and costs nothing.
+// Either way the results are real businesses. Nothing is invented: OpenStreetMap
+// has no ratings or review counts, so those fields are null for its leads, and
+// `hasWebsite` comes straight from the OSM website tag.
+//
+// A real (non-demo) search requires a signed-in Clerk user. Demo mode (demo=1)
+// is the only path that works without a session — it is clearly labelled sample
+// data and costs nothing.
 //
 // Check order for a GET: (1) missing "query" → 400, (2) demo=1 → sample data,
-// (3) no signed-in user → 401, (4) no/invalid Google Places key → 503
-// not_configured, (5) real Places results. Because the auth gate runs before
-// the provider check, an anonymous caller always sees 401 rather than 503.
+// (3) no signed-in user → 401, (4) live provider lookup (503 not_configured if a
+// configured Google Places key is rejected, 404 unknown location, 502 provider
+// outage). Because the auth gate runs before the provider check, an anonymous
+// caller always sees 401 rather than a provider error.
 //
 // Demo mode is strictly opt-in: the client must pass demo=1 (the dashboard
 // only sends it after the user clicks a clearly labelled "Preview with sample
@@ -28,9 +37,9 @@ import { prisma } from "@/lib/prisma";
 // marked sample: true, and the UI is required to show a persistent
 // "Sample data — not real businesses" banner while demo results are visible.
 //
-// Google Places does not provide email addresses or social links. Those fields
-// are returned as null and the UI renders "Not listed" — nothing is fabricated
-// to fill them in.
+// Neither provider gives email addresses or social links everywhere. Those
+// fields are null when the provider has nothing and the UI renders "Not listed"
+// — nothing is fabricated to fill them in.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -64,24 +73,6 @@ interface PlacesResult {
   currentOpeningHours?: { openNow?: boolean };
   types?: string[];
   businessStatus?: string;
-}
-
-export interface Lead {
-  id: string;
-  name: string;
-  businessType: string;
-  location: string;
-  rating: string | null;
-  reviewCount: number | null;
-  phone: string | null;
-  email: string | null;
-  address: string | null;
-  hasWebsite: boolean;
-  websiteUrl: string | null;
-  socialLinks: { instagram: null; facebook: null };
-  priceRange: string | null;
-  openNow: boolean | null;
-  sample: boolean;
 }
 
 const PRICE_LEVELS: Record<string, string> = {
@@ -118,14 +109,8 @@ function mapPlace(place: PlacesResult, location: string): Lead {
     priceRange: PRICE_LEVELS[place.priceLevel ?? ""] ?? null,
     openNow: typeof place.currentOpeningHours?.openNow === "boolean" ? place.currentOpeningHours.openNow : null,
     sample: false,
+    source: "google_places",
   };
-}
-
-class NotConfiguredError extends Error {
-  constructor() {
-    super("Lead search is not configured yet.");
-    this.name = "NotConfiguredError";
-  }
 }
 
 // A failed call to the Google Places API. Kept as a distinct type so the
@@ -152,7 +137,7 @@ async function fetchFromGooglePlaces(
   pageToken?: string
 ): Promise<{ leads: Lead[]; nextPageToken: string | null }> {
   const key = process.env.GOOGLE_PLACES_API_KEY;
-  if (!key) throw new NotConfiguredError();
+  if (!key) throw new PlacesApiError(401);
 
   const body: Record<string, unknown> = { textQuery, pageSize: 20 };
   if (pageToken) body.pageToken = pageToken;
@@ -375,9 +360,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ---- Live provider: Google Places (GOOGLE_PLACES_API_KEY) ----
-    // Real searches spend paid Google Places quota, so they require a signed-in
-    // user. Demo mode above is the only unauthenticated path.
+    // ---- Live providers ----
+    // Google Places when a key is configured (billed per request), otherwise
+    // OpenStreetMap, which needs no key at all. Either way the search needs a
+    // signed-in user: demo mode above is the only unauthenticated path.
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json(
@@ -389,38 +375,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const searchLocation = location || "Austin, TX";
+    const usesGooglePlaces = Boolean(process.env.GOOGLE_PLACES_API_KEY);
+    const source: LeadSource = usesGooglePlaces ? "google_places" : "openstreetmap";
+
     let leads: Lead[] = [];
     let nextPageToken: string | null = null;
-    try {
-      const textQuery = location ? `${query} in ${location}` : query;
-      const fetched = await fetchFromGooglePlaces(textQuery, location || "Austin, TX", pageToken);
-      leads = fetched.leads;
-      nextPageToken = fetched.nextPageToken;
-    } catch (err) {
-      if (err instanceof NotConfiguredError) {
-        return NextResponse.json(
-          {
-            status: "not_configured",
-            error:
-              "Lead search is not connected yet. Live results are looked up from Google Places once the search key is configured.",
-          },
-          { status: 503 }
-        );
-      }
-      if (err instanceof PlacesApiError) {
-        if (isPlacesConfigError(err.status)) {
-          return NextResponse.json(
-            {
-              status: "not_configured",
-              error:
-                "Lead search is not connected yet. The Google Places search key is missing, invalid, or has run out of quota — check the configured key and try again.",
-            },
-            { status: 503 }
-          );
+
+    if (usesGooglePlaces) {
+      try {
+        const textQuery = location ? `${query} in ${location}` : query;
+        const fetched = await fetchFromGooglePlaces(textQuery, searchLocation, pageToken);
+        leads = fetched.leads;
+        nextPageToken = fetched.nextPageToken;
+      } catch (err) {
+        if (err instanceof PlacesApiError) {
+          if (isPlacesConfigError(err.status)) {
+            return NextResponse.json(
+              {
+                status: "not_configured",
+                error:
+                  "Lead search is paused: the Google Places search key on this deployment is missing, invalid or out of quota. Results normally come from OpenStreetMap, which needs no key — remove or fix the Google Places key to search again.",
+              },
+              { status: 503 }
+            );
+          }
+          return NextResponse.json({ status: "error", error: err.message }, { status: 502 });
         }
-        return NextResponse.json({ status: "error", error: err.message }, { status: 502 });
+        throw err;
       }
-      throw err;
+    } else {
+      // No Google Places key — real businesses come from OpenStreetMap.
+      try {
+        leads = await fetchFromOpenStreetMap(query, searchLocation);
+      } catch (err) {
+        if (err instanceof LocationNotFoundError) {
+          return NextResponse.json({ status: "error", error: err.message }, { status: 404 });
+        }
+        if (err instanceof OpenStreetMapError) {
+          return NextResponse.json({ status: "error", error: err.message }, { status: 502 });
+        }
+        throw err;
+      }
     }
 
     // Businesses showing no website first — that is the point of the tool.
@@ -460,6 +456,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       status: "ok",
       demo: false,
+      source,
       results: pageLeads,
       pagination: {
         page: 1,
@@ -470,7 +467,7 @@ export async function GET(request: NextRequest) {
         nextPageToken,
       },
       query,
-      location: location || "Austin, TX",
+      location: searchLocation,
     });
   } catch (error) {
     console.error("Leads API error:", error);
