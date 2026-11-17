@@ -1,11 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { FREE_SITE_CREDITS } from "@/lib/site-credits";
 
 /**
  * The signed-in user's database row, created on first use if it does not exist
  * yet. Every authenticated route that needs a User row goes through here, so a
- * brand-new account gets its row (plan "free", aiCredits 0 — both schema
- * defaults) on the first request it makes, not only after saving a site.
+ * brand-new account gets its row (plan "free", plus its 3 free site credits) on
+ * the first request it makes, not only after saving a site.
  *
  * upsert (not find-then-create) so two parallel first requests cannot race into
  * a unique-constraint error on clerkId.
@@ -17,7 +18,7 @@ export async function getCurrentUser() {
   return prisma.user.upsert({
     where: { clerkId: userId },
     update: {},
-    create: { clerkId: userId },
+    create: { clerkId: userId, aiCredits: FREE_SITE_CREDITS },
   });
 }
 
