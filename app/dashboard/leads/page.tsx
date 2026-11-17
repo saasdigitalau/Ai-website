@@ -34,6 +34,7 @@ interface SearchMeta {
   query: string;
   location: string;
   demo: boolean;
+  source: "google_places" | "openstreetmap" | null;
 }
 
 const SUGGESTIONS = [
@@ -111,7 +112,7 @@ export default function LeadsPage() {
         demoRef.current = demo;
         setResults((prev) => (append ? dedupeById(prev, data.results) : data.results));
         setPagination(data.pagination);
-        setSearchMeta({ query: q.trim(), location: searchLocation, demo });
+        setSearchMeta({ query: q.trim(), location: searchLocation, demo, source: data.source ?? null });
       } catch (e: any) {
         setError(e.message || "Something went wrong");
       } finally {
@@ -183,8 +184,8 @@ export default function LeadsPage() {
       <div>
         <h1 className="font-heading text-2xl font-extrabold text-gray-900">Lead Finder</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Find local businesses without websites. Real results are looked up live from Google Places and filtered to
-          the ones showing no website.
+          Find local businesses without websites. Results are real businesses from OpenStreetMap, which needs no key and
+          no paid plan — every business is listed with its website status, and the ones with no site are flagged.
         </p>
       </div>
 
@@ -288,10 +289,12 @@ export default function LeadsPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-heading text-sm font-bold text-amber-900">Lead search is not connected yet</h3>
+              <h3 className="font-heading text-sm font-bold text-amber-900">Live lead search is paused</h3>
               <p className="mt-1 text-sm text-amber-700 leading-relaxed">
-                Live results are looked up from Google Places in real time. The search key hasn&apos;t been added yet, so
-                no real searches can run. You can preview the layout with clearly labelled sample data below.
+                Results normally come from OpenStreetMap — free, open map data, no key needed. A Google Places search
+                key is set on this deployment and was rejected (missing, invalid or out of quota), so live searches
+                are paused until that key is removed or fixed. You can preview the layout with clearly labelled sample
+                data below.
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <button
@@ -316,7 +319,7 @@ export default function LeadsPage() {
             Sample data — not real businesses
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-amber-700">Live results will appear once Google Places is connected.</span>
+            <span className="text-xs text-amber-700">Live results come from OpenStreetMap — no key needed.</span>
             <button
               onClick={exitDemo}
               className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold text-amber-800 bg-amber-200 hover:bg-amber-300 transition-all"
@@ -357,6 +360,13 @@ export default function LeadsPage() {
               </button>
             </div>
           </div>
+
+          {searchMeta?.source === "openstreetmap" && (
+            <p className="text-[11px] text-gray-400">
+              These businesses come from OpenStreetMap (open data by OpenStreetMap contributors, ODbL). OpenStreetMap
+              has no star ratings or review counts, so those fields show a dash.
+            </p>
+          )}
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {results.map((b) => (
