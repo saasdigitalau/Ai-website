@@ -25,7 +25,10 @@ model User {
   razorpaySubscriptionId String?  @unique
   razorpayPlanId         String?
   subscriptionEndsAt     DateTime?
-  aiCredits     Int       @default(0)
+  // Site credits. One generated site costs one credit (lib/site-credits.ts) and
+  // a new account starts with 3 free ones; a paid month sets the balance to the
+  // plan's allowance. The column keeps its original name.
+  aiCredits     Int       @default(3)
   whiteLabel    Boolean   @default(false) // Remove SiteLaunch branding from client portal
   whiteLabelLogo String?  // Custom logo URL for white-label
   whiteLabelDomain String? // Custom domain for client portal
