@@ -13,6 +13,7 @@ import {
   Users,
   Palette,
   MessageCircle,
+  Phone,
 } from "lucide-react";
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard/chat-widget", label: "Chat Widget", icon: MessageCircle },
   { href: "/dashboard/clients", label: "Clients", icon: Users },
   { href: "/dashboard/leads", label: "Lead Finder", icon: Search },
+  { href: "/dashboard/receptionist", label: "Receptionist", icon: Phone },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
