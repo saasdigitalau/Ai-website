@@ -1100,13 +1100,143 @@ function extractBusinessType(description: string): string {
   return "general";
 }
 
+// Words that describe a kind of business rather than name one. A candidate made
+// only of these is a description of a business, not its name.
+const GENERIC_NAME_WORDS = new Set([
+  "a", "an", "the", "and", "or", "of", "for", "in", "at", "on", "near", "with", "to",
+  "we", "our", "my", "your", "it", "this", "that", "by",
+  "family", "local", "friendly", "trusted", "professional", "experienced", "qualified",
+  "modern", "new", "small", "boutique", "best", "leading", "independent", "mobile",
+  "online", "quality", "affordable", "premium", "expert", "caring", "gentle", "full",
+  "specialist", "dedicated", "reliable", "honest", "community", "award", "winning",
+  "dentist", "dental", "dentistry", "doctor", "gp", "physio", "physiotherapist",
+  "physiotherapy", "chiropractor", "podiatrist", "optometrist", "veterinarian", "vet",
+  "vets", "psychologist", "therapist", "therapy", "counsellor", "counselor", "clinic",
+  "medical", "health", "wellness", "hospital", "pharmacy", "surgery", "allied",
+  "solicitor", "lawyer", "law", "legal", "attorney", "barrister", "conveyancer",
+  "accountant", "accounting", "bookkeeper", "bookkeeping", "tax", "auditor", "advisor",
+  "adviser", "consultant", "consultancy", "consulting", "agency", "agent",
+  "plumber", "plumbing", "electrician", "electrical", "builder", "building", "carpenter",
+  "carpentry", "painter", "painting", "roofer", "roofing", "landscaper", "landscaping",
+  "gardener", "tiler", "tiling", "handyman", "mechanic", "automotive", "construction",
+  "trades", "trade", "contractor",
+  "restaurant", "cafe", "coffee", "bakery", "bar", "pub", "takeaway", "bistro", "eatery",
+  "kitchen", "catering", "food",
+  "gym", "fitness", "pilates", "yoga", "studio", "personal", "trainer", "training",
+  "coach", "coaching", "sports", "sport", "dance", "swimming",
+  "salon", "hairdresser", "hair", "barber", "beauty", "nails", "lashes", "brows", "spa",
+  "massage", "aesthetics", "cosmetic", "skin", "skincare",
+  "photographer", "photography", "photo", "videographer", "celebrant", "wedding",
+  "weddings", "venue", "events", "event", "florist", "stylist", "styling", "designer",
+  "design", "designs", "creative", "artist",
+  "shop", "store", "retail", "supplies", "supplier", "services", "service", "solutions",
+  "group", "company", "co", "business", "practice", "firm", "partners", "associates",
+  "team", "centre", "center", "hub", "collective", "emporium", "studios", "works",
+  "real", "estate", "property", "properties", "rentals", "leasing", "mortgage", "broker",
+  "brokerage", "finance", "financial", "insurance", "investment",
+  "pet", "pets", "grooming", "groomer", "kennel", "childcare", "child", "care",
+  "kindergarten", "preschool", "tutoring", "tuition", "school", "academy", "education",
+  "learning",
+]);
+
+// The honest label shown when a description names no business at all.
+const PLACEHOLDER_NAME = "Your Business Name";
+
+// Title-case an extracted name without mangling the way people write names:
+// acronyms (NSW, HVAC) and internal capitals (McDonald's, iPhone) are kept.
+function titleCaseName(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      const letters = word.replace(/[^A-Za-z'’]/g, "");
+      if (/^[A-Z]{2,4}$/.test(letters) || /[A-Z]/.test(letters.slice(1))) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+// Cut a description down to the words that could be a business name: drop the
+// leading article, stop at the first verb, drop a trailing "in <place>" clause
+// and never cut a word in half.
+function nameCandidate(description: string): string {
+  // Only the first sentence/clause can hold the name.
+  let text = (description || "").split(/[\n.;!?]/)[0];
+
+  // "a family dentist in Parramatta" -> "family dentist in Parramatta"
+  text = text.replace(/^\s*(?:we\s+are\s+|we're\s+|we\s+|this\s+is\s+)?(?:a|an|the)\s+/i, "");
+
+  // The name is the subject; from the first verb on it is description:
+  // "Joe's Cafe is a ...", "Bright Smile Dental offers ...".
+  text = text.split(
+    /\s+(?:is|are|was|were|offers?|provides?|serves?|serving|offering|providing|speciali[sz]es?|speciali[sz]ing|has|have|helps?|delivers?|runs?|operates?|makes?|sells?|does|do|can|will)\b/i
+  )[0];
+
+  // Drop a trailing location clause: "family dentist in Parramatta",
+  // "solicitor based in Perth". A capitalised place is always a clause, and so
+  // is anything following two or more words; that keeps names like
+  // "Bread in Common" intact.
+  const location = text.match(
+    /\s+(?:(?:located|based|situated|serving)\s+)?(?:in|at|near|around|across)\s+(.*)$/u
+  );
+  if (location) {
+    const before = text.slice(0, location.index ?? 0);
+    if (/^[A-Z0-9]/.test(location[1]) || before.trim().split(/\s+/).length >= 2) {
+      text = before;
+    }
+  }
+
+  text = text.replace(/[\s,&/-]+$/g, "").trim();
+
+  // Cut on a word boundary so no word is ever emitted half-finished.
+  const MAX_LENGTH = 40;
+  if (text.length > MAX_LENGTH) {
+    const head = text.slice(0, MAX_LENGTH);
+    const lastSpace = head.lastIndexOf(" ");
+    text = (lastSpace > 0 ? head.slice(0, lastSpace) : head).replace(/[\s,&/-]+$/g, "").trim();
+  }
+
+  // A dangling conjunction is not part of a name either.
+  return text.replace(/\s+(?:and|or|of|for|the|a|an|in|at|on|with|&)$/i, "").trim();
+}
+
+function isNameLike(candidate: string): boolean {
+  const words = candidate.split(/\s+/).filter(Boolean);
+  if (!words.length) return false;
+  const bare = words.map((word) => word.toLowerCase().replace(/[^a-z0-9'’]/g, ""));
+  // Nothing but description words ("family dentist", "plumbing services").
+  if (!bare.some((word) => word && !GENERIC_NAME_WORDS.has(word))) return false;
+  // A proper noun carries the name; a bare capitalised adjective at the start of
+  // a sentence does not ("A Family Dentist in Parramatta").
+  return words.some(
+    (word, i) =>
+      (/^[A-Z0-9]/.test(word) || /['’]s$/i.test(word)) && !GENERIC_NAME_WORDS.has(bare[i])
+  );
+}
+
 function extractName(description: string, businessType: string): string {
-  const nameRegex = /(?:called|named|known as|")([^"]+)"?/i;
-  const match = description.match(nameRegex);
-  if (match) return match[1].trim();
-  const startMatch = description.match(/^(?:a|an|the)?\s*(\w+(?:\s+\w+){0,3})?\s*(?:is|are|offers|provides)/i);
-  if (startMatch && startMatch[1]) return startMatch[1].trim();
-  return BUSINESS_TEMPLATES[businessType]?.defaultName || "Professional Services";
+  const templateDefault = BUSINESS_TEMPLATES[businessType]?.defaultName;
+  // Templates whose default is already an honest placeholder ("Your Clinic",
+  // "Your Practice") keep it; invented-sounding defaults never stand in for a
+  // name the description did not give.
+  const fallback =
+    templateDefault && /^Your\b/.test(templateDefault) ? templateDefault : PLACEHOLDER_NAME;
+
+  // "a cafe called Joe's" / 'the "Little Bakery"' — an explicit name is taken
+  // as written.
+  const explicit = description.match(
+    /(?:called|named|known\s+as)\s+["“']?([^",.;!?\n]{2,60})/i
+  );
+  const quoted = description.match(/["“]([^"”\n]{2,60})["”]/);
+  const named = explicit?.[1] ?? quoted?.[1];
+  if (named) {
+    const cleaned = nameCandidate(named.replace(/["“”]/g, ""));
+    if (cleaned && cleaned.length > 1) return titleCaseName(cleaned);
+  }
+
+  const candidate = nameCandidate(description);
+  if (!candidate || !isNameLike(candidate)) return fallback;
+  return titleCaseName(candidate);
 }
 
 // UI chrome strings, translated for the most common languages.
