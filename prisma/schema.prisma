@@ -40,6 +40,7 @@ model User {
   leads     LeadSearch[]
   clients   Client[]
   planPurchases PlanPurchase[]
+  callEnquiries CallEnquiry[]
 }
 
 model Website {
@@ -202,6 +203,45 @@ model PlanPurchase {
   updatedAt         DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+// One phone call taken by the receptionist, written only by the
+// signature-verified post-call webhook (app/api/receptionist/webhook/route.ts).
+// callId is unique because Retell delivers both call_ended and call_analyzed for
+// the same call and retries a failed delivery up to three times: the first
+// delivery creates the row, later ones fill in the analysis without duplicating
+// it. userId is null when the call could not be attributed to an account (the
+// agent was not provisioned with that account's id) — the call is still stored,
+// it just has nobody to email.
+model CallEnquiry {
+  id              String   @id @default(cuid())
+  userId          String?
+  callId          String   @unique
+  agentId         String?
+  direction       String? // inbound, outbound
+  fromNumber      String? // the caller's number as the phone network reported it
+  toNumber        String? // the receptionist number that was called
+  callerName      String? // said by the caller, taken from the post-call analysis
+  callerNumber    String? // repeated back by the caller, from the post-call analysis
+  reason          String? // why they called, from the post-call analysis
+  summary         String? // Retell's call summary
+  transcript      String?
+  recordingUrl    String?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationSeconds Int?
+  lastEvent       String? // call_ended, call_analyzed
+  // pending, sent, not_configured (no RESEND_API_KEY), no_owner, failed
+  emailStatus     String   @default("pending")
+  emailedAt       DateTime?
+  emailError      String?
+  rawPayload      Json? // the verified webhook body, kept so nothing is lost
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
 }
